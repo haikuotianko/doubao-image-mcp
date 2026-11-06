@@ -433,14 +433,12 @@ MCP 主体是纯 Go（`internal/doubao` 协议客户端、`internal/mcpserver` �
 一键打完所有包：
 
 ```powershell
-pwsh -File scripts\build-release.ps1 -Version v1.0.0
+powershell -File scripts\build-release.ps1 -Version v1.1.0
 ```
 
 **为什么 mac/Linux 没有 GUI 包**：Wails 的图形界面要 cgo（mac 用 WKWebView，Linux 用 WebKitGTK），而 cgo 无法在 Windows 上交叉编译，`wails build -platform darwin/arm64` 会直接告警 `Crosscompiling to Mac not currently supported`。所以这两个平台发的是纯 Go 的命令行版——MCP 功能完整，只是没有窗口。想要 GUI 就在对应平台上跑一次 `wails build`。
 
 平台差异被收敛到三处，都用构建标签分开了：
-
-平台差异被收敛到了三处，都用构建标签分开了：
 
 | 位置 | Windows | macOS / Linux |
 | --- | --- | --- |
