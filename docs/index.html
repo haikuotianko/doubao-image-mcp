@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>豆包生图 MCP — 用网页登录态直接生图，无需 API Key</title>
+<meta name="description" content="把豆包网页版的生图能力封装成本地 MCP 服务：不需要官方 API Key，Claude Desktop / Cursor 等任意 MCP 客户端可用，支持扫码登录、多账号自动排队、多图全量返回。">
+<meta property="og:title" content="豆包生图 MCP">
+<meta property="og:description" content="用你自己的豆包网页登录态生图，接入任意 MCP 客户端，无需 API Key。">
+<meta property="og:image" content="screenshot.png">
+<link rel="icon" href="icon.png">
+<style>
+  :root {
+    --blue: #0057ff;
+    --deep: #00248c;
+    --bg: #f5f7fb;
+    --card: #ffffff;
+    --ink: #0d1526;
+    --muted: #5b667a;
+    --line: #e4e9f4;
+    --code-bg: #0d1526;
+    --code-ink: #dbe6ff;
+    --radius: 16px;
+    --shadow: 0 10px 30px rgba(13, 21, 38, .08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #080e1b;
+      --card: #101a2c;
+      --ink: #e9effc;
+      --muted: #94a2bd;
+      --line: #1d2941;
+      --code-bg: #060b15;
+      --code-ink: #d6e2ff;
+      --shadow: 0 10px 30px rgba(0, 0, 0, .35);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Cascadia Code", monospace; }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+
+  /* ---------- 顶栏 ---------- */
+  header.nav {
+    position: sticky; top: 0; z-index: 20;
+    backdrop-filter: saturate(180%) blur(12px);
+    background: color-mix(in srgb, var(--bg) 86%, transparent);
+    border-bottom: 1px solid var(--line);
+  }
+  .nav-inner {
+    display: flex; align-items: center; gap: 14px;
+    height: 60px; max-width: 1080px; margin: 0 auto; padding: 0 20px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--ink); }
+  .brand img { width: 26px; height: 26px; border-radius: 7px; }
+  .nav-links { margin-left: auto; display: flex; gap: 22px; font-size: 14px; }
+  .nav-links a { color: var(--muted); }
+  .nav-links a:hover { color: var(--ink); text-decoration: none; }
+  @media (max-width: 720px) { .nav-links { display: none; } }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    background: linear-gradient(135deg, var(--blue) 0%, var(--deep) 100%);
+    color: #fff;
+    padding: 64px 0 76px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::after {
+    content: ""; position: absolute; inset: auto -10% -60% -10%; height: 240px;
+    background: radial-gradient(60% 100% at 50% 0%, rgba(255,255,255,.18), transparent 70%);
+    pointer-events: none;
+  }
+  .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 44px; align-items: center; }
+  .hero h1 { font-size: 40px; line-height: 1.2; margin: 0 0 14px; letter-spacing: -.5px; }
+  .hero h1 span { opacity: .72; font-weight: 500; }
+  .hero p.lead { font-size: 17px; margin: 0 0 10px; color: rgba(255,255,255,.9); }
+  .hero p.sub { font-size: 14px; margin: 0 0 26px; color: rgba(255,255,255,.66); }
+  .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px; }
+  .badge {
+    font-size: 12.5px; padding: 5px 11px; border-radius: 999px;
+    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.22);
+    color: #fff;
+  }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 22px; border-radius: 10px; font-weight: 600; font-size: 15px;
+    transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+  }
+  .btn:hover { text-decoration: none; transform: translateY(-1px); }
+  .btn-primary { background: #fff; color: var(--deep); box-shadow: 0 8px 20px rgba(0,0,0,.18); }
+  .btn-ghost { background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.3); }
+  .btn-ghost:hover { background: rgba(255,255,255,.2); }
+  .shot {
+    border-radius: 14px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,.35);
+    border: 1px solid rgba(255,255,255,.16); background: #fff;
+    line-height: 0;
+  }
+  .shot img { width: 100%; display: block; }
+  @media (max-width: 860px) {
+    .hero { padding: 44px 0 56px; }
+    .hero-grid { grid-template-columns: 1fr; gap: 32px; }
+    .hero h1 { font-size: 30px; }
+  }
+
+  /* ---------- 通用区块 ---------- */
+  section { padding: 64px 0; }
+  section + section { border-top: 1px solid var(--line); }
+  h2 { font-size: 26px; margin: 0 0 8px; letter-spacing: -.3px; }
+  .section-desc { color: var(--muted); margin: 0 0 32px; font-size: 15px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 22px; box-shadow: var(--shadow);
+  }
+  .card h3 { margin: 0 0 8px; font-size: 16px; }
+  .card p { margin: 0; color: var(--muted); font-size: 14px; }
+  .card .ico { font-size: 20px; margin-bottom: 10px; display: block; }
+
+  /* ---------- 表格 ---------- */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-weight: 600; color: var(--muted); font-size: 13px; text-transform: none; background: color-mix(in srgb, var(--bg) 60%, transparent); }
+  tr:last-child td { border-bottom: 0; }
+  td code { background: color-mix(in srgb, var(--blue) 8%, transparent); padding: 2px 6px; border-radius: 5px; font-size: 13px; }
+
+  /* ---------- 下载 ---------- */
+  .dl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
+  .dl {
+    display: flex; flex-direction: column; gap: 6px;
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 20px; box-shadow: var(--shadow); color: var(--ink);
+  }
+  .dl:hover { text-decoration: none; border-color: color-mix(in srgb, var(--blue) 45%, var(--line)); }
+  .dl .os { font-weight: 700; font-size: 15.5px; display: flex; align-items: center; gap: 8px; }
+  .dl .meta { color: var(--muted); font-size: 13px; }
+  .dl .tag {
+    font-size: 11.5px; padding: 2px 8px; border-radius: 999px;
+    background: color-mix(in srgb, var(--blue) 12%, transparent); color: var(--blue); font-weight: 600;
+  }
+  .dl-note { margin-top: 16px; color: var(--muted); font-size: 13.5px; }
+
+  /* ---------- 代码块 ---------- */
+  .code {
+    position: relative; background: var(--code-bg); color: var(--code-ink);
+    border-radius: 12px; padding: 18px 18px; overflow-x: auto; font-size: 13.5px; line-height: 1.65;
+    border: 1px solid rgba(255,255,255,.08);
+  }
+  .code pre { margin: 0; }
+  .copy {
+    position: absolute; top: 10px; right: 10px; font-size: 12px; cursor: pointer;
+    background: rgba(255,255,255,.1); color: #dbe6ff; border: 1px solid rgba(255,255,255,.16);
+    border-radius: 7px; padding: 4px 10px; font-family: inherit;
+  }
+  .copy:hover { background: rgba(255,255,255,.2); }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tab {
+    cursor: pointer; font-size: 14px; padding: 8px 16px; border-radius: 9px;
+    border: 1px solid var(--line); background: var(--card); color: var(--muted); font-family: inherit;
+  }
+  .tab.active { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 600; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .steps { margin: 0 0 18px; padding-left: 20px; color: var(--muted); font-size: 14.5px; }
+  .steps li { margin-bottom: 6px; }
+  .steps code { color: var(--ink); background: color-mix(in srgb, var(--blue) 8%, transparent); padding: 2px 6px; border-radius: 5px; }
+
+  /* ---------- FAQ ---------- */
+  details {
+    border: 1px solid var(--line); border-radius: 12px; background: var(--card);
+    padding: 16px 18px; margin-bottom: 12px;
+  }
+  details summary { cursor: pointer; font-weight: 600; font-size: 15px; }
+  details p { margin: 10px 0 0; color: var(--muted); font-size: 14px; }
+
+  /* ---------- 页脚 ---------- */
+  footer {
+    border-top: 1px solid var(--line); padding: 34px 0 46px; color: var(--muted); font-size: 13.5px;
+  }
+  footer .row { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; }
+  footer a { color: var(--muted); text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#top"><img src="icon.png" alt="">豆包生图 MCP</a>
+    <nav class="nav-links">
+      <a href="#features">特性</a>
+      <a href="#tools">工具</a>
+      <a href="#download">下载</a>
+      <a href="#start">快速开始</a>
+      <a href="#faq">常见问题</a>
+      <a href="https://github.com/haikuotianko/doubao-image-mcp">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<div class="hero" id="top">
+  <div class="wrap hero-grid">
+    <div>
+      <h1>豆包生图 MCP<br><span>用你自己的登录态，不花一分钱 API</span></h1>
+      <p class="lead">把豆包网页版的生图能力封装成本地 MCP 服务，Claude Desktop、Cursor 等任意客户端直接调用。</p>
+      <p class="sub">不需要官方 API Key · 无需逆向硬啃接口 · Seedream 4.0 / 4.5 / 5.0 全系可用</p>
+      <div class="badges">
+        <span class="badge">Windows GUI + 扫码登录</span>
+        <span class="badge">macOS / Linux 命令行版</span>
+        <span class="badge">5 个 MCP 工具</span>
+        <span class="badge">多账号自动排队</span>
+      </div>
+      <div class="cta">
+        <a class="btn btn-primary" href="#download">立即下载</a>
+        <a class="btn btn-ghost" href="https://github.com/haikuotianko/doubao-image-mcp">查看源码</a>
+      </div>
+    </div>
+    <div class="shot"><img src="screenshot.png" alt="豆包生图 MCP 界面截图" loading="lazy"></div>
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <h2>它能做什么</h2>
+    <p class="section-desc">一句话：让你的 AI 客户端拥有豆包的生图能力，用的是你已经登录的账号。</p>
+    <div class="cards">
+      <div class="card">
+        <span class="ico">🔗</span>
+        <h3>无水印直链</h3>
+        <p>从 SSE 里挑 <code>image_raw</code> / <code>dwm3</code> 模板地址，拿到的就是原图直链，不用自己去水印。</p>
+      </div>
+      <div class="card">
+        <span class="ico">🖼️</span>
+        <h3>多图全量返回</h3>
+        <p>服务端一次可能给 1~4 张，全部返回：本地文件路径 + CDN 链接 + 尺寸，结构化解析漏掉的还会按原文补回。</p>
+      </div>
+      <div class="card">
+        <span class="ico">👥</span>
+        <h3>多账号自动排队</h3>
+        <p>默认账号优先、每号并发 1 个任务，全忙就排队而不是失败；停用的账号不参与调度。</p>
+      </div>
+      <div class="card">
+        <span class="ico">📱</span>
+        <h3>MCP 里直接扫码</h3>
+        <p>没有账号时调用 <code>doubao_login</code>，客户端会直接弹出一个扫码窗口，扫完自动保存。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="tools">
+  <div class="wrap">
+    <h2>5 个 MCP 工具</h2>
+    <p class="section-desc">stdio 与 streamable HTTP 两种传输都支持，客户端配好即可用。</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th style="width:180px">工具</th><th>作用</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>doubao_image</code></td><td>文生图 / 图生图，一次生成几张就返回几张（路径 + 链接 + 尺寸）</td></tr>
+          <tr><td><code>doubao_login</code></td><td>直接从 AI 客户端弹窗扫码登录，不用切到 GUI</td></tr>
+          <tr><td><code>doubao_models</code></td><td>列出可用模型、32 种风格 key、8 种比例</td></tr>
+          <tr><td><code>doubao_ping</code></td><td>检查登录态是否有效，也能识别 IP 风控</td></tr>
+          <tr><td><code>doubao_accounts</code></td><td>账号池：列出 / 切换默认 / 启用 / 停用 / 删除</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="download">
+  <div class="wrap">
+    <h2>下载</h2>
+    <p class="section-desc" id="dl-caption">按你的系统选一个，解压即用。Windows 版含图形界面与扫码登录。</p>
+    <div class="dl-grid" id="dl-grid">
+      <a class="dl" href="https://github.com/haikuotianko/doubao-image-mcp/releases/latest">
+        <span class="os">前往 Releases 下载</span>
+        <span class="meta">正在读取最新版本…</span>
+      </a>
+    </div>
+    <p class="dl-note">
+      macOS / Linux 是纯命令行版：MCP、<code>-set-session</code>、<code>-diagnose</code> 功能完整，但没有图形界面
+      （Wails 的 GUI 需要在该平台上用 cgo 编译）。打包脚本与源码见
+      <a href="https://github.com/haikuotianko/doubao-image-mcp">GitHub</a>。
+    </p>
+  </div>
+</section>
+
+<section id="start">
+  <div class="wrap">
+    <h2>快速开始</h2>
+    <p class="section-desc">Windows 用 GUI 登录，macOS / Linux 粘贴一次 Cookie 即可，之后都是同一条 MCP 配置。</p>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="win">Windows</button>
+      <button class="tab" data-tab="unix">macOS / Linux</button>
+      <button class="tab" data-tab="mcp">接入 MCP 客户端</button>
+    </div>
+
+    <div class="panel active" id="panel-win">
+      <ol class="steps">
+        <li>下载 <code>windows-x64.zip</code>（ARM 机器选 <code>windows-arm64</code>），解压到任意目录</li>
+        <li>双击 <code>doubao-image-mcp.exe</code></li>
+        <li>点账号卡片上的「扫码登录」，用豆包 App 扫一下</li>
+        <li>复制界面里「MCP 服务」卡片生成的 JSON，粘进客户端并重启</li>
+      </ol>
+      <p class="section-desc" style="margin-bottom:0">
+        配置与账号保存在 <code>%APPDATA%\doubao-image-mcp</code>，所以移动或改名 exe 不会丢账号。
+      </p>
+    </div>
+
+    <div class="panel" id="panel-unix">
+      <ol class="steps">
+        <li>解压后给执行权限，并导入一次登录态</li>
+        <li>浏览器按 <code>F12</code> → Network → 任意 <code>doubao.com</code> 请求 → 复制整段 <code>cookie:</code> 请求头</li>
+        <li>把整段 Cookie 粘给 <code>-set-session</code>，之后即可交给 MCP 客户端</li>
+      </ol>
+      <div class="code"><button class="copy">复制</button><pre>unzip doubao-image-mcp-v1.1.0-macos-arm64-cli.zip -d doubao-image-mcp
+cd doubao-image-mcp &amp;&amp; chmod +x doubao-image-mcp
+
+# 整段 Cookie、Copy as cURL、或者只填 sessionid 都认
+./doubao-image-mcp -set-session "sessionid=…; ttwid=…; s_v_web_id=…"
+
+# 客户端拉起时用这条
+./doubao-image-mcp -mcp</pre></div>
+      <p class="dl-note">macOS 首次运行若被 Gatekeeper 拦：<code>xattr -d com.apple.quarantine ./doubao-image-mcp</code></p>
+    </div>
+
+    <div class="panel" id="panel-mcp">
+      <p class="section-desc">stdio 模式（推荐，客户端自己拉起进程）：</p>
+      <div class="code"><button class="copy">复制</button><pre>{
+  "mcpServers": {
+    "doubao": {
+      "command": "C:\\Users\\你\\Downloads\\doubao-image-mcp.exe",
+      "args": ["-mcp"]
+    }
+  }
+}</pre></div>
+      <p class="section-desc" style="margin-top:18px">或者常驻 HTTP 模式（一个进程服务多个客户端）：</p>
+      <div class="code"><button class="copy">复制</button><pre>.\doubao-image-mcp.exe -http 127.0.0.1:8770
+
+# 客户端配置
+{
+  "mcpServers": {
+    "doubao": { "type": "http", "url": "http://127.0.0.1:8770/mcp" }
+  }
+}</pre></div>
+      <p class="dl-note">⚠️ HTTP 接口没有鉴权，默认只绑 <code>127.0.0.1</code>，不要改成监听局域网。</p>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>常见问题</h2>
+    <p class="section-desc">更多细节见 <a href="https://github.com/haikuotianko/doubao-image-mcp#readme">README</a>。</p>
+
+    <details>
+      <summary>需要豆包官方 API Key 吗？</summary>
+      <p>不需要。程序用的是你自己在浏览器里登录后的 Cookie，走网页版接口，免费账号就能用 Seedream 5.0 Flash。</p>
+    </details>
+    <details>
+      <summary>会被封号吗？</summary>
+      <p>属于逆向调用网页接口，没有官方保证。程序做了并发限制（每个账号同时只跑一个任务）与自动排队来降低风控概率；请自己控制频率，不要批量刷额度。</p>
+    </details>
+    <details>
+      <summary>为什么 macOS / Linux 没有图形界面？</summary>
+      <p>Wails 的 GUI 依赖 cgo（mac 用 WKWebView，Linux 用 WebKitGTK），无法在 Windows 上交叉编译。所以这两个平台发的是纯 Go 命令行版，MCP 功能完整，只是登录改为粘贴一次 Cookie。</p>
+    </details>
+    <details>
+      <summary>扫码窗口白屏怎么办？</summary>
+      <p>多半是 WebView2 运行时缺失、代理或网络问题。跑一次 <code>doubao-image-mcp.exe -diagnose</code>，报告会生成在配置目录里，含系统版本、WebView2 版本、代理与连通性检测结果。</p>
+    </details>
+    <details>
+      <summary>多个客户端同时用会怎样？</summary>
+      <p>stdio 模式下每个客户端会拉起自己的进程，队列不共享；要严格串行就用 HTTP 模式，由同一个进程统一调度。</p>
+    </details>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap row">
+    <span>© <span id="year">2026</span> haikuotianko · MIT License</span>
+    <span>
+      <a href="https://github.com/haikuotianko/doubao-image-mcp">源代码</a> ·
+      <a href="https://github.com/haikuotianko/doubao-image-mcp/releases">版本发布</a> ·
+      <a href="https://github.com/haikuotianko/doubao-image-mcp/issues">问题反馈</a>
+    </span>
+  </div>
+  <div class="wrap" style="margin-top:14px">
+    ⚠️ 非官方项目，调用豆包网页版接口，随时可能因服务端调整而失效。仅供个人学习与自用，请遵守豆包用户协议。
+  </div>
+</footer>
+
+<script>
+  document.getElementById('year').textContent = new Date().getFullYear();
+
+  // 代码块复制
+  document.querySelectorAll('.copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var text = btn.parentElement.querySelector('pre').innerText;
+      navigator.clipboard.writeText(text).then(function () {
+        btn.textContent = '已复制';
+        setTimeout(function () { btn.textContent = '复制'; }, 1500);
+      }).catch(function () { btn.textContent = '复制失败'; });
+    });
+  });
+
+  // 选项卡
+  var tabs = document.querySelectorAll('.tab');
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () {
+      tabs.forEach(function (x) { x.classList.remove('active'); });
+      document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
+      t.classList.add('active');
+      document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+    });
+  });
+
+  // 下载列表：读取最新 Release 的资产，按平台排序渲染
+  var REPO = 'haikuotianko/doubao-image-mcp';
+  var PLATFORMS = [
+    { match: /windows-x64\.zip$/,   os: 'Windows x64',          tag: '推荐',   note: 'GUI 完整版 · 含扫码登录' },
+    { match: /windows-x86\.zip$/,   os: 'Windows x86（32 位）', tag: '',       note: 'GUI 完整版 · 老机器' },
+    { match: /windows-arm64\.zip$/, os: 'Windows ARM64',        tag: '',       note: 'GUI 完整版' },
+    { match: /macos-arm64-cli\.zip$/, os: 'macOS Apple 芯片',   tag: '',       note: '命令行版' },
+    { match: /macos-x64-cli\.zip$/,  os: 'macOS Intel',         tag: '',       note: '命令行版' },
+    { match: /linux-x64-cli\.zip$/,  os: 'Linux x64',           tag: '',       note: '命令行版' },
+    { match: /linux-arm64-cli\.zip$/, os: 'Linux ARM64',        tag: '',       note: '命令行版' }
+  ];
+
+  function fmtSize(bytes) {
+    return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+  }
+
+  function render(release) {
+    var grid = document.getElementById('dl-grid');
+    var assets = release.assets || [];
+    var html = '';
+    PLATFORMS.forEach(function (p) {
+      var a = assets.find(function (x) { return p.match.test(x.name); });
+      if (!a) return;
+      html += '<a class="dl" href="' + a.browser_download_url + '">' +
+        '<span class="os">' + p.os + (p.tag ? ' <span class="tag">' + p.tag + '</span>' : '') + '</span>' +
+        '<span class="meta">' + p.note + ' · ' + fmtSize(a.size) + '</span>' +
+        '</a>';
+    });
+    if (html) {
+      grid.innerHTML = html;
+      document.getElementById('dl-caption').textContent =
+        '最新版本 ' + release.tag_name + ' · 按你的系统选一个，解压即用。';
+    }
+  }
+
+  fetch('https://api.github.com/repos/' + REPO + '/releases/latest')
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(render)
+    .catch(function () {
+      document.getElementById('dl-grid').innerHTML =
+        '<a class="dl" href="https://github.com/' + REPO + '/releases/latest">' +
+        '<span class="os">前往 Releases 下载</span>' +
+        '<span class="meta">按平台选择安装包</span></a>';
+    });
+</script>
+</body>
+</html>
