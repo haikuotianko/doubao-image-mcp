@@ -44,20 +44,50 @@ MCP 对外提供 5 个工具：
 
 ## 环境要求
 
-- **Windows 10 / 11（x64）**：完整支持，含扫码登录窗口。
-- **macOS / Linux**：MCP 与 GUI 可用，但**没有内置扫码登录**，需要手动导入 `sessionid`（见[安装 → 方式三](#方式三macos--linux)）。
+- **Windows 10 / 11**：完整支持（GUI + 扫码登录），x64 / x86 / ARM64 都有预编译包。
+- **macOS / Linux**：有预编译**命令行版**（MCP 功能完整），但没有 GUI、没有内置扫码登录，登录用 `-set-session` 手动导入（见[安装 → 方式三](#方式三macos--linux)）。想要 GUI 就在该平台上自己 `wails build`。
 - [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)：仅 Windows 的扫码窗口需要；Win11 自带，Win10 若缺失程序会明确提示。
 - 一个豆包账号（免费账号就能用 Seedream 5.0 Flash）。
+
+## 下载
+
+到 [Releases](../../releases/latest) 按你的平台选一个：
+
+| 平台 | 资产 | 形态 |
+| --- | --- | --- |
+| Windows x64 | `…-windows-amd64.zip` | GUI 完整版 |
+| Windows ARM64 | `…-windows-arm64.zip` | GUI 完整版 |
+| Windows x86（32 位） | `…-windows-386.zip` | GUI 完整版（老机器） |
+| macOS Apple Silicon | `…-darwin-arm64-cli.zip` | 命令行版 |
+| macOS Intel | `…-darwin-amd64-cli.zip` | 命令行版 |
+| Linux x64 | `…-linux-amd64-cli.zip` | 命令行版 |
+| Linux ARM64 | `…-linux-arm64-cli.zip` | 命令行版 |
+
+> **命令行版**包含 `-mcp`（stdio）、`-http`、`-set-session`、`-diagnose`、`-view` 等全部命令，只是没有图形界面。
+> 每个包都是「可执行文件 + README + LICENSE」，解压即用。mac/Linux 上首次运行可能需要 `chmod +x doubao-image-mcp`。
 
 ## 安装
 
 ### 方式一：下载 Release（推荐）
 
-1. 到 [Releases](../../releases) 下载 `doubao-image-mcp-vX.Y.Z-windows-amd64.zip`
+**Windows**：
+
+1. 下载 `…-windows-amd64.zip`（ARM 机器选 arm64，32 位系统选 386）
 2. 解压到任意目录（路径可以含中文和空格）
 3. 双击 `doubao-image-mcp.exe`
 
 程序是单文件，不需要安装。配置和账号写在 `%APPDATA%\doubao-image-mcp`，所以移动/改名 exe 不会丢账号。
+
+**macOS / Linux（命令行版）**：
+
+```bash
+unzip doubao-image-mcp-v1.0.0-darwin-arm64-cli.zip -d doubao-image-mcp
+cd doubao-image-mcp && chmod +x doubao-image-mcp
+./doubao-image-mcp -set-session "<从浏览器复制的 sessionid>"
+./doubao-image-mcp -mcp        # MCP 客户端拉起时用
+```
+
+首次从网上下载的二进制在 macOS 上可能被 Gatekeeper 拦，执行 `xattr -d com.apple.quarantine ./doubao-image-mcp` 即可。
 
 ### 方式二：从源码构建
 
@@ -357,12 +387,23 @@ mac/Linux 上的 GUI 里，「扫码登录」按钮会换成**手动导入 sessi
 
 ## 跨平台说明
 
-MCP 主体是纯 Go（`internal/doubao` 协议客户端、`internal/mcpserver` 工具定义、`internal/accountpool` 调度、`internal/config` 持久化），**在 macOS / Linux 上可以直接编译运行**：
+MCP 主体是纯 Go（`internal/doubao` 协议客户端、`internal/mcpserver` 工具定义、`internal/accountpool` 调度、`internal/config` 持久化），因此 **7 个平台的包都是同一份代码编出来的**：
 
-```bash
-GOOS=darwin  GOARCH=arm64 go build .   # 已实测能出 Mach-O 二进制
-GOOS=linux   GOARCH=amd64 go build .   # 已实测能出 ELF 二进制
+| 目标 | 产物 | 构建方式 |
+| --- | --- | --- |
+| windows/amd64、windows/386、windows/arm64 | PE（GUI 完整） | `wails build -platform windows/<arch>` |
+| darwin/arm64、darwin/amd64 | Mach-O（命令行） | `GOOS=darwin GOARCH=… CGO_ENABLED=0 go build` |
+| linux/amd64、linux/arm64 | ELF（命令行） | `GOOS=linux GOARCH=… CGO_ENABLED=0 go build` |
+
+一键打完所有包：
+
+```powershell
+pwsh -File scripts\build-release.ps1 -Version v1.0.0
 ```
+
+**为什么 mac/Linux 没有 GUI 包**：Wails 的图形界面要 cgo（mac 用 WKWebView，Linux 用 WebKitGTK），而 cgo 无法在 Windows 上交叉编译，`wails build -platform darwin/arm64` 会直接告警 `Crosscompiling to Mac not currently supported`。所以这两个平台发的是纯 Go 的命令行版——MCP 功能完整，只是没有窗口。想要 GUI 就在对应平台上跑一次 `wails build`。
+
+平台差异被收敛到三处，都用构建标签分开了：
 
 平台差异被收敛到了三处，都用构建标签分开了：
 
