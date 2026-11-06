@@ -340,8 +340,7 @@ function renderHTTP(running) {
 }
 
 function renderLogs(lines) {
-  el('logs').textContent = lines.join('\n');
-  el('logs').scrollTop = el('logs').scrollHeight;
+  el('logs').textContent = lines.join('\n');  el('logs').scrollTop = el('logs').scrollHeight;
 }
 
 function appendLog(line) {
