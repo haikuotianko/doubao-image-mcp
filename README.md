@@ -1,5 +1,7 @@
 # 豆包生图 MCP（doubao-image-mcp）
 
+**官网 / 下载页：<https://haikuotianko.github.io/doubao-image-mcp/>**
+
 把**豆包网页版**（doubao.com）的生图能力封装成本地 MCP 服务：**不需要官方 API Key**，用你自己的网页登录态直接调用，Seedream 4.0 / 4.5 / 5.0 全系可用。附带一个桌面端（Wails + WebView2），负责扫码登录、多账号管理、测试生图与排障。
 
 > Local MCP server that exposes Doubao's web image generation as tools for Claude Desktop / Cursor / any MCP client — no API key, just your own web session.

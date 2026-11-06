@@ -83,7 +83,7 @@
     pointer-events: none;
   }
   .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 44px; align-items: center; }
-  .hero h1 { font-size: 40px; line-height: 1.2; margin: 0 0 14px; letter-spacing: -.5px; }
+  .hero h1 { font-size: clamp(28px, 3.3vw, 40px); line-height: 1.2; margin: 0 0 14px; letter-spacing: -.5px; }
   .hero h1 span { opacity: .72; font-weight: 500; }
   .hero p.lead { font-size: 17px; margin: 0 0 10px; color: rgba(255,255,255,.9); }
   .hero p.sub { font-size: 14px; margin: 0 0 26px; color: rgba(255,255,255,.66); }
@@ -215,7 +215,7 @@
 <div class="hero" id="top">
   <div class="wrap hero-grid">
     <div>
-      <h1>豆包生图 MCP<br><span>用你自己的登录态，不花一分钱 API</span></h1>
+      <h1>豆包生图 MCP<br><span>用你自己的登录态生图</span></h1>
       <p class="lead">把豆包网页版的生图能力封装成本地 MCP 服务，Claude Desktop、Cursor 等任意客户端直接调用。</p>
       <p class="sub">不需要官方 API Key · 无需逆向硬啃接口 · Seedream 4.0 / 4.5 / 5.0 全系可用</p>
       <div class="badges">
@@ -330,7 +330,7 @@
         <li>浏览器按 <code>F12</code> → Network → 任意 <code>doubao.com</code> 请求 → 复制整段 <code>cookie:</code> 请求头</li>
         <li>把整段 Cookie 粘给 <code>-set-session</code>，之后即可交给 MCP 客户端</li>
       </ol>
-      <div class="code"><button class="copy">复制</button><pre>unzip doubao-image-mcp-v1.1.0-macos-arm64-cli.zip -d doubao-image-mcp
+      <div class="code"><button class="copy">复制</button><pre>unzip doubao-image-mcp-v*-macos-arm64-cli.zip -d doubao-image-mcp
 cd doubao-image-mcp &amp;&amp; chmod +x doubao-image-mcp
 
 # 整段 Cookie、Copy as cURL、或者只填 sessionid 都认
@@ -338,7 +338,7 @@ cd doubao-image-mcp &amp;&amp; chmod +x doubao-image-mcp
 
 # 客户端拉起时用这条
 ./doubao-image-mcp -mcp</pre></div>
-      <p class="dl-note">macOS 首次运行若被 Gatekeeper 拦：<code>xattr -d com.apple.quarantine ./doubao-image-mcp</code></p>
+      <p class="dl-note">把 <code>-set-session</code> 换成你的真实 Cookie；只填 <code>sessionid</code> 也能用。macOS 首次运行若被 Gatekeeper 拦：<code>xattr -d com.apple.quarantine ./doubao-image-mcp</code></p>
     </div>
 
     <div class="panel" id="panel-mcp">
