@@ -2,6 +2,8 @@
 
 把**豆包网页版**（doubao.com）的生图能力封装成本地 MCP 服务：不需要官方 API Key，用你自己的网页登录态直接调用，Seedream 4.0 / 4.5 / 5.0 全系可用。附带一个桌面端（Wails + WebView2），负责扫码登录、账号池、测试生图与排障。
 
+> Local MCP server that turns Doubao's web image generation into tools for Claude / Cursor / any MCP client — no API key, just your own web session. Windows 10/11 only.
+
 - **扫码登录**：内置 WebView2 窗口，豆包 App 扫码即可；`sessionid` 是 HttpOnly，只能从浏览器 Cookie 里取，所以必须用内嵌浏览器。
 - **会话可见**：账号行点「会话」会把**该账号的 cookie** 灌进浏览器再打开豆包——登录态还在不在，一眼看到，而不是靠猜。
 - **多图全量**：一次生成 1~4 张就返回几张；GUI 里点任意一张看大图，可另存到任意目录。
