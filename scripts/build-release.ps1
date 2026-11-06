@@ -14,7 +14,7 @@ function New-Package {
     param(
         [string]$Source,     # 构建产物路径
         [string]$Entry,      # 压缩包里的可执行文件名
-        [string]$Suffix      # 平台后缀，如 windows-amd64
+        [string]$Suffix      # 平台后缀，如 windows-x64
     )
     $dir = Join-Path $pack $Suffix
     New-Item -ItemType Directory -Force $dir | Out-Null
@@ -28,11 +28,17 @@ function New-Package {
 }
 
 Write-Host "== Windows（含 GUI，Wails 构建）"
+# 资产名用大家熟悉的叫法：amd64 → x64，386 → x86
+$winTargets = @(
+    @{ arch = 'amd64'; suffix = 'windows-x64' },
+    @{ arch = '386';   suffix = 'windows-x86' },
+    @{ arch = 'arm64'; suffix = 'windows-arm64' }
+)
 
-foreach ($arch in 'amd64', '386', 'arm64') {
-    & wails build -platform "windows/$arch" -o doubao-image-mcp.exe | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "windows/$arch 构建失败" }
-    New-Package (Join-Path $root 'build\bin\doubao-image-mcp.exe') 'doubao-image-mcp.exe' "windows-$arch"
+foreach ($t in $winTargets) {
+    & wails build -platform "windows/$($t.arch)" -o doubao-image-mcp.exe | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "windows/$($t.arch) 构建失败" }
+    New-Package (Join-Path $root 'build\bin\doubao-image-mcp.exe') 'doubao-image-mcp.exe' $t.suffix
 }
 
 Write-Host "== macOS / Linux（仅命令行：MCP + -set-session，无 GUI）"
@@ -40,10 +46,10 @@ Write-Host "== macOS / Linux（仅命令行：MCP + -set-session，无 GUI）"
 # 所以发的是纯 Go 的 CLI 构建，MCP 功能完整。
 
 $cliTargets = @(
-    @{ os = 'darwin'; arch = 'arm64' },
-    @{ os = 'darwin'; arch = 'amd64' },
-    @{ os = 'linux';  arch = 'amd64' },
-    @{ os = 'linux';  arch = 'arm64' }
+    @{ os = 'darwin'; arch = 'arm64'; suffix = 'macos-arm64-cli' },
+    @{ os = 'darwin'; arch = 'amd64'; suffix = 'macos-x64-cli' },
+    @{ os = 'linux';  arch = 'amd64'; suffix = 'linux-x64-cli' },
+    @{ os = 'linux';  arch = 'arm64'; suffix = 'linux-arm64-cli' }
 )
 
 foreach ($t in $cliTargets) {
@@ -55,8 +61,13 @@ foreach ($t in $cliTargets) {
     $code = $LASTEXITCODE
     Remove-Item Env:GOOS, Env:GOARCH, Env:CGO_ENABLED -ErrorAction SilentlyContinue
     if ($code -ne 0) { throw "$($t.os)/$($t.arch) 构建失败" }
-    New-Package $out 'doubao-image-mcp' ("{0}-{1}-cli" -f $t.os, $t.arch)
+    New-Package $out 'doubao-image-mcp' $t.suffix
     Remove-Item $out -Force
 }
+
+Write-Host "== 恢复本地开发版为 windows/amd64"
+# 上面最后一个 wails 构建是 arm64，这里重建一次，保证 build\bin 里是常用的 x64
+& wails build -platform "windows/amd64" -o doubao-image-mcp.exe | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "windows/amd64 重建失败" }
 
 Write-Host "== 结束，产物在 build\dist\"

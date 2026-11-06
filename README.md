@@ -55,12 +55,12 @@ MCP 对外提供 5 个工具：
 
 | 平台 | 资产 | 形态 |
 | --- | --- | --- |
-| Windows x64 | `…-windows-amd64.zip` | GUI 完整版 |
+| Windows x64（64 位） | `…-windows-x64.zip` | GUI 完整版 |
+| Windows x86（32 位） | `…-windows-x86.zip` | GUI 完整版（老机器） |
 | Windows ARM64 | `…-windows-arm64.zip` | GUI 完整版 |
-| Windows x86（32 位） | `…-windows-386.zip` | GUI 完整版（老机器） |
-| macOS Apple Silicon | `…-darwin-arm64-cli.zip` | 命令行版 |
-| macOS Intel | `…-darwin-amd64-cli.zip` | 命令行版 |
-| Linux x64 | `…-linux-amd64-cli.zip` | 命令行版 |
+| macOS Apple Silicon | `…-macos-arm64-cli.zip` | 命令行版 |
+| macOS Intel | `…-macos-x64-cli.zip` | 命令行版 |
+| Linux x64 | `…-linux-x64-cli.zip` | 命令行版 |
 | Linux ARM64 | `…-linux-arm64-cli.zip` | 命令行版 |
 
 > **命令行版**包含 `-mcp`（stdio）、`-http`、`-set-session`、`-diagnose`、`-view` 等全部命令，只是没有图形界面。
@@ -72,7 +72,7 @@ MCP 对外提供 5 个工具：
 
 **Windows**：
 
-1. 下载 `…-windows-amd64.zip`（ARM 机器选 arm64，32 位系统选 386）
+1. 下载 `…-windows-x64.zip`（ARM 机器选 `windows-arm64`，32 位系统选 `windows-x86`）
 2. 解压到任意目录（路径可以含中文和空格）
 3. 双击 `doubao-image-mcp.exe`
 
@@ -81,7 +81,7 @@ MCP 对外提供 5 个工具：
 **macOS / Linux（命令行版）**：
 
 ```bash
-unzip doubao-image-mcp-v1.1.0-darwin-arm64-cli.zip -d doubao-image-mcp
+unzip doubao-image-mcp-v1.1.0-macos-arm64-cli.zip -d doubao-image-mcp
 cd doubao-image-mcp && chmod +x doubao-image-mcp
 ./doubao-image-mcp -set-session "sessionid=…; ttwid=…"   # 整段 Cookie 直接粘，取法见下方
 ./doubao-image-mcp -mcp        # MCP 客户端拉起时用
