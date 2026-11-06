@@ -123,6 +123,8 @@ export namespace main {
 	    autoStartHttp: boolean;
 	    configPath: string;
 	    exePath: string;
+	    platform: string;
+	    loginSupported: boolean;
 	    models: doubao.Model[];
 	    styles: doubao.Style[];
 	    ratios: string[];
@@ -147,6 +149,8 @@ export namespace main {
 	        this.autoStartHttp = source["autoStartHttp"];
 	        this.configPath = source["configPath"];
 	        this.exePath = source["exePath"];
+	        this.platform = source["platform"];
+	        this.loginSupported = source["loginSupported"];
 	        this.models = this.convertValues(source["models"], doubao.Model);
 	        this.styles = this.convertValues(source["styles"], doubao.Style);
 	        this.ratios = source["ratios"];

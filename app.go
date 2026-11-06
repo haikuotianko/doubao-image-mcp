@@ -7,13 +7,13 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"doubao-image-mcp/internal/config"
 	"doubao-image-mcp/internal/doubao"
@@ -115,6 +115,8 @@ type Status struct {
 	AutoStartHTTP bool           `json:"autoStartHttp"`
 	ConfigPath    string         `json:"configPath"`
 	ExePath       string         `json:"exePath"`
+	Platform      string         `json:"platform"`
+	LoginSupport  bool           `json:"loginSupported"`
 	Models        []doubao.Model `json:"models"`
 	Styles        []doubao.Style `json:"styles"`
 	Ratios        []string       `json:"ratios"`
@@ -136,6 +138,8 @@ func (a *App) Status() Status {
 		AutoStartHTTP: cfg.AutoStartHTTP,
 		ConfigPath:    config.Path(),
 		ExePath:       exePath(),
+		Platform:      runtime.GOOS,
+		LoginSupport:  loginwin.Supported(),
 		Models:        doubao.Models,
 		Styles:        doubao.Styles,
 		Ratios:        doubao.Ratios,
@@ -193,7 +197,7 @@ func (a *App) SaveSettings(s Settings) error {
 
 // ChooseOutDir 弹出目录选择框。
 func (a *App) ChooseOutDir() (string, error) {
-	dir, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+	dir, err := wailsruntime.OpenDirectoryDialog(a.ctx, wailsruntime.OpenDialogOptions{
 		Title:            "选择图片输出目录",
 		DefaultDirectory: a.store.Get().OutDir,
 	})
@@ -206,13 +210,13 @@ func (a *App) ChooseOutDir() (string, error) {
 	return dir, nil
 }
 
-// OpenOutDir 在资源管理器里打开输出目录。
+// OpenOutDir 在系统文件管理器里打开输出目录。
 func (a *App) OpenOutDir() error {
 	dir := a.store.Get().OutDir
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	return exec.Command("explorer", dir).Start()
+	return openFolder(dir)
 }
 
 // ---------------------------------------------------------------- 登录
@@ -402,22 +406,44 @@ func (a *App) CancelLogin() {
 	}
 }
 
-// SaveCookies 是登录窗口不可用时的兜底：手动粘贴 sessionid。
-func (a *App) SaveCookies(sessionID, ttwid string) error {
+// ImportSession 手动导入 sessionid。
+// 这是 mac / Linux 上的登录方式（那边没有内置 WebView2 扫码窗口）。
+func (a *App) ImportSession(sessionID, ttwid string) (string, error) {
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" {
-		return errors.New("sessionid 不能为空")
+		return "", errors.New("sessionid 不能为空")
 	}
 	cookies := map[string]string{"sessionid": sessionID}
 	if v := strings.TrimSpace(ttwid); v != "" {
 		cookies["ttwid"] = v
 	}
-	name := fmt.Sprintf("manual-%s", time.Now().Format("0102-1504"))
+
+	name := a.accountNameFor(cookies)
 	if err := a.store.PutAccount(config.Account{Name: name, Cookies: cookies, AddedAt: time.Now()}); err != nil {
-		return err
+		return "", err
 	}
-	a.logf("已保存手动账号 %s", name)
-	return a.store.SetActive(name)
+	if err := a.store.SetActive(name); err != nil {
+		return name, err
+	}
+	a.logf("已导入账号 %s（手动 sessionid）", name)
+
+	client := doubao.New(cookies)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	if err := client.Ping(ctx); err != nil {
+		return name, fmt.Errorf("账号已保存，但登录校验失败：%s", doubao.FormatError(err))
+	}
+	if profile, err := client.FetchProfile(ctx); err == nil {
+		_ = a.store.UpdateProfile(name, profile.Nickname, profile.Avatar)
+		a.logf("账号 %s 资料已更新: %s", name, firstNonEmpty(profile.Nickname, "(无昵称)"))
+	}
+	return name, nil
+}
+
+// SaveCookies 是 ImportSession 的旧名字，保留给老前端/脚本。
+func (a *App) SaveCookies(sessionID, ttwid string) error {
+	_, err := a.ImportSession(sessionID, ttwid)
+	return err
 }
 
 // UseAccount 设置默认账号（空字符串 = 按列表顺序取第一个）。
@@ -626,10 +652,10 @@ func (a *App) SaveImageAs(src string) (string, error) {
 	if st, err := os.Stat(src); err != nil || st.IsDir() {
 		return "", fmt.Errorf("找不到本地文件: %s", src)
 	}
-	target, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+	target, err := wailsruntime.SaveFileDialog(a.ctx, wailsruntime.SaveDialogOptions{
 		Title:           "图片另存为",
 		DefaultFilename: filepath.Base(src),
-		Filters: []runtime.FileFilter{
+		Filters: []wailsruntime.FileFilter{
 			{DisplayName: "图片", Pattern: "*.png;*.jpg;*.jpeg;*.webp;*.heic"},
 		},
 	})
@@ -646,7 +672,7 @@ func (a *App) SaveImageAs(src string) (string, error) {
 	return target, nil
 }
 
-// ShowInFolder 在资源管理器里定位到这张图。
+// ShowInFolder 在系统文件管理器里定位到这张图。
 func (a *App) ShowInFolder(path string) error {
 	if strings.TrimSpace(path) == "" {
 		return errors.New("这张图没有本地文件")
@@ -654,7 +680,7 @@ func (a *App) ShowInFolder(path string) error {
 	if _, err := os.Stat(path); err != nil {
 		return fmt.Errorf("找不到文件: %s", path)
 	}
-	return exec.Command("explorer", "/select,"+path).Start()
+	return revealInFolder(path)
 }
 
 func copyFile(src, dst string) error {
@@ -702,7 +728,7 @@ func (a *App) logf(format string, args ...any) {
 		println(line)
 		return
 	}
-	runtime.EventsEmit(a.ctx, "log", line)
+	wailsruntime.EventsEmit(a.ctx, "log", line)
 }
 
 // logFilePath 是落盘日志的位置。别人机器出问题时，让他把这个文件发回来。

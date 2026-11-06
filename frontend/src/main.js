@@ -3,6 +3,7 @@ import './style.css';
 import {EventsOn} from '../wailsjs/runtime/runtime';
 import {
     ChooseOutDir,
+    ImportSession,
     LoginDialog,
     OpenOutDir,
     RemoveAccount,
@@ -39,6 +40,12 @@ document.querySelector('#app').innerHTML = `
         <h2>账号</h2>
         <button class="primary sm" id="btnLogin">扫码登录</button>
       </div>
+      <div class="row" id="manualImport" style="display:none">
+        <input type="text" id="sessionInput" placeholder="粘贴 sessionid" style="flex:1 1 160px" />
+        <input type="text" id="ttwidInput" placeholder="ttwid（可选）" style="width:150px" />
+        <button class="primary sm" id="btnSaveSession">导入</button>
+      </div>
+      <div class="hint" id="manualHint" style="display:none">当前平台没有内置扫码登录：先在浏览器登录豆包网页版，从开发者工具的 Cookie 里复制 <code>sessionid</code>（可选 ttwid）粘贴到上面。</div>
       <div class="accounts" id="accounts"><div class="empty">还没有账号，点右上角「扫码登录」。</div></div>
       <div class="hint">可以登录多个账号：每点一次「扫码登录」都会清掉浏览器旧登录态、重新出二维码。拖动账号可调整顺序，生图按顺序排队到空闲的已启用账号。</div>
     </section>
@@ -137,6 +144,12 @@ function renderAccounts(status) {
   if (status.waiting > 0) {
     badge.textContent += ` · 排队 ${status.waiting}`;
   }
+
+  // 非 Windows 没有内置扫码登录，换成手动导入 sessionid。
+  const canScan = status.loginSupport !== false;
+  el('btnLogin').style.display = canScan ? '' : 'none';
+  el('manualImport').style.display = canScan ? 'none' : 'flex';
+  el('manualHint').style.display = canScan ? 'none' : '';
 
   if (accounts.length === 0) {
     box.innerHTML = '<div class="empty">还没有账号，点右上角「扫码登录」（可以连续加多个）。</div>';
@@ -380,6 +393,30 @@ async function act(fn, okMessage) {
   await refresh();
   return result;
 }
+
+// 手动导入 sessionid（mac / Linux 的登录方式）。
+el('btnSaveSession').onclick = async () => {
+  const sid = el('sessionInput').value.trim();
+  const ttwid = el('ttwidInput').value.trim();
+  if (!sid) {
+    appendLog('请先粘贴 sessionid');
+    return;
+  }
+  el('btnSaveSession').disabled = true;
+  try {
+    const name = await ImportSession(sid, ttwid);
+    if (name) {
+      appendLog('已导入账号 ' + name);
+      el('sessionInput').value = '';
+      el('ttwidInput').value = '';
+    }
+  } catch (err) {
+    appendLog('导入失败：' + (err && err.message ? err.message : err));
+  } finally {
+    el('btnSaveSession').disabled = false;
+    refresh();
+  }
+};
 
 el('btnLogin').onclick = async () => {
   el('btnLogin').disabled = true;

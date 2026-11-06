@@ -10,6 +10,8 @@ export function ChooseOutDir():Promise<string>;
 
 export function HTTPRunning():Promise<boolean>;
 
+export function ImportSession(arg1:string,arg2:string):Promise<string>;
+
 export function LoginDialog():Promise<main.LoginResult>;
 
 export function Logs():Promise<Array<string>>;

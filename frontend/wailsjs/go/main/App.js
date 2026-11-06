@@ -18,6 +18,10 @@ export function HTTPRunning() {
   return window['go']['main']['App']['HTTPRunning']();
 }
 
+export function ImportSession(arg1, arg2) {
+  return window['go']['main']['App']['ImportSession'](arg1, arg2);
+}
+
 export function LoginDialog() {
   return window['go']['main']['App']['LoginDialog']();
 }

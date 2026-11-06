@@ -26,6 +26,9 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// Supported 表示当前平台是否支持内置扫码登录。
+func Supported() bool { return true }
+
 // RuntimeVersion 返回本机 WebView2 运行时版本，空字符串表示没装或读不到。
 func RuntimeVersion() string {
 	v, err := webviewloader.GetAvailableCoreWebView2BrowserVersionString("")

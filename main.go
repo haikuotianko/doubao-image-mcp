@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/wailsapp/wails/v2"
@@ -15,6 +16,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 
 	"doubao-image-mcp/internal/config"
+	"doubao-image-mcp/internal/doubao"
 	"doubao-image-mcp/internal/loginwin"
 	"doubao-image-mcp/internal/mcpserver"
 )
@@ -30,8 +32,14 @@ func main() {
 	loginMode := flag.Bool("login", false, "只打开扫码登录窗口（不启动主界面，排查用）")
 	loginURL := flag.String("login-url", "", "登录窗口打开的地址（默认豆包对话页，排查用）")
 	viewMode := flag.Bool("view", false, "用当前账号的会话打开浏览器窗口（等同 GUI 的「查看会话」）")
+	setSession := flag.String("set-session", "", "手动导入 sessionid（mac/Linux 没有扫码登录窗口时用）")
+	ttwidFlag := flag.String("ttwid", "", "配合 -set-session 的可选 ttwid")
 	flag.Parse()
 
+	if *setSession != "" {
+		runSetSession(*setSession, *ttwidFlag)
+		return
+	}
 	if *diagMode {
 		runDiagnose(*quietMode)
 		return
@@ -53,6 +61,52 @@ func main() {
 		return
 	}
 	runGUI()
+}
+
+// runSetSession 手动导入 sessionid 并落盘，供 mac / Linux（没有扫码登录窗口）使用。
+func runSetSession(sessionID, ttwid string) {
+	logf := func(format string, args ...any) {
+		line := fmt.Sprintf(format, args...)
+		fmt.Printf("%s %s\n", time.Now().Format("15:04:05"), line)
+		fileLog(time.Now().Format("2006-01-02 15:04:05") + " " + line)
+	}
+
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		logf("sessionid 不能为空")
+		return
+	}
+	store, err := config.Load()
+	if err != nil {
+		logf("读取配置失败: %v", err)
+		return
+	}
+
+	cookies := map[string]string{"sessionid": sessionID}
+	if v := strings.TrimSpace(ttwid); v != "" {
+		cookies["ttwid"] = v
+	}
+	name := "manual-" + time.Now().Format("0102-150405")
+	if err := store.PutAccount(config.Account{Name: name, Cookies: cookies, AddedAt: time.Now()}); err != nil {
+		logf("保存账号失败: %v", err)
+		return
+	}
+	_ = store.SetActive(name)
+	logf("已保存账号 %s", name)
+
+	client := doubao.New(cookies)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	if err := client.Ping(ctx); err != nil {
+		logf("登录校验失败: %s", doubao.FormatError(err))
+		return
+	}
+	logf("登录校验通过")
+	if profile, err := client.FetchProfile(ctx); err == nil {
+		_ = store.UpdateProfile(name, profile.Nickname, profile.Avatar)
+		logf("账号资料: %s", firstNonEmpty(profile.Nickname, "(无昵称)"))
+	}
+	logf("现在可以用了：-mcp（stdio）或 GUI 都会读到这个账号")
 }
 
 // runViewOnly 用配置里当前账号的 cookie 打开一个浏览窗口，等同于 GUI 的「查看会话」。

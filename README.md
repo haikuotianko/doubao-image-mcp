@@ -41,8 +41,9 @@ MCP 对外提供 4 个工具：
 
 ## 环境要求
 
-- **Windows 10 / 11（x64）** —— 当前唯一完整支持的平台，原因见[跨平台说明](#跨平台说明)。
-- [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)：Win11 自带；Win10 若缺失，登录窗口打不开（程序会明确提示并给出日志）。
+- **Windows 10 / 11（x64）**：完整支持，含扫码登录窗口。
+- **macOS / Linux**：MCP 与 GUI 可用，但**没有内置扫码登录**，需要手动导入 `sessionid`（见[安装 → 方式三](#方式三macos--linux)）。
+- [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)：仅 Windows 的扫码窗口需要；Win11 自带，Win10 若缺失程序会明确提示。
 - 一个豆包账号（免费账号就能用 Seedream 5.0 Flash）。
 
 ## 安装
@@ -68,9 +69,40 @@ wails build          # 产出 build\bin\doubao-image-mcp.exe
 
 只改后端时可以 `go build ./...` 快速验证编译。
 
+### 方式三：macOS / Linux
+
+MCP 本体（协议客户端、工具、账号池）是纯 Go，可以直接跑；**缺的只是 Windows 那个内置扫码窗口**，所以登录改成手动导入 `sessionid`。
+
+```bash
+# 需要 Go 1.22+
+go build -o doubao-image-mcp .
+
+# 1) 手动导入登录态：在浏览器登录豆包网页版，
+#    从开发者工具 → Application → Cookies 里复制 sessionid（可选 ttwid）
+#    导入时会顺带校验登录态、抓头像和昵称
+./doubao-image-mcp -set-session "<粘贴 sessionid>" -ttwid "<可选>"
+
+# 2) 交给 MCP 客户端（stdio 模式）
+./doubao-image-mcp -mcp
+```
+
+想要 GUI 的话：
+
+```bash
+# macOS：需要 Xcode 命令行工具（xcode-select --install）
+# Linux：需要 GTK/WebKit2GTK 开发包，例如 Debian/Ubuntu:
+#   sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev
+go install github.com/wailsapp/wails/v2/cmd/wails@latest
+wails build
+```
+
+mac/Linux 上的 GUI 里，「扫码登录」按钮会换成**手动导入 sessionid** 的输入框，其余功能（账号池、排队、测试生图、大图查看、另存）都一样。
+
+> **未验证**：作者只有 Windows 机器，mac/Linux 只验证到「交叉编译通过」（`GOOS=darwin` / `GOOS=linux go build .` 都能出二进制）。真实运行、GUI 渲染、`open`/`xdg-open` 打开目录需要 macOS / Linux 用户帮忙验证；有问题请开 issue 附上 `-diagnose` 报告。
+
 ## 首次使用
 
-1. 打开程序，点账号卡片右上角的 **「扫码登录」**。
+1. 打开程序，点账号卡片右上角的 **「扫码登录」**（mac/Linux 是「导入 sessionid」）。
 2. 弹出内置浏览器窗口，用豆包 App 扫码，窗口自动关闭。
 3. 账号出现在列表里，带**头像 + 昵称**（登录成功后自动抓取）。
 4. 在「设置」里选好输出目录（默认 `图片\doubao-image-mcp`）、默认模型/比例/风格。
@@ -304,17 +336,28 @@ wails build          # 产出 build\bin\doubao-image-mcp.exe
 
 ## 跨平台说明
 
-Go 本身当然跨平台，这个项目里 **MCP 主体也是纯 Go**（`internal/doubao` 协议客户端、`internal/mcpserver` 工具定义、`internal/accountpool` 调度、`internal/config` 持久化），没有任何平台绑定。
+MCP 主体是纯 Go（`internal/doubao` 协议客户端、`internal/mcpserver` 工具定义、`internal/accountpool` 调度、`internal/config` 持久化），**在 macOS / Linux 上可以直接编译运行**：
 
-卡住的是这三处，都在 Windows 专有 API 上：
+```bash
+GOOS=darwin  GOARCH=arm64 go build .   # 已实测能出 Mach-O 二进制
+GOOS=linux   GOARCH=amd64 go build .   # 已实测能出 ELF 二进制
+```
 
-| 位置 | 依赖 | 换到 macOS / Linux 要做什么 |
+平台差异被收敛到了三处，都用构建标签分开了：
+
+| 位置 | Windows | macOS / Linux |
 | --- | --- | --- |
-| `internal/loginwin` | Win32 窗口 + WebView2 的 CookieManager（`//go:build windows`） | 换成 WKWebView（mac）/ WebKitGTK（Linux），或改为「手动粘贴 sessionid」 |
-| `diagnose.go` | `golang.org/x/sys/windows`、注册表 | 拆成 `_windows.go` / `_unix.go` 两份实现 |
-| `app.go` 的「打开所在文件夹」 | `explorer.exe` | 换 `open` / `xdg-open` |
+| `internal/loginwin/window_windows.go` | Win32 窗口 + WebView2，扫码登录 | `stub_other.go`：返回「当前平台没有内置扫码登录」，界面换成手动导入 sessionid |
+| `diagnose.go` + `diagnose_windows.go` / `diagnose_other.go` | 读注册表拿系统版本与 IE 代理 | 用 `runtime.GOOS` + 环境变量 |
+| `reveal_windows.go` / `reveal_other.go` | `explorer /select` | `open -R`（mac）/ `xdg-open`（Linux） |
 
-所以在 macOS / Linux 上目前 `go build` 会在 `loginwin` 和 `x/sys/windows` 上断掉。要让它在 mac 上跑起来，最小改动是给登录窗口加一个「手动导入 cookie」通道（把 `sessionid` 填进 `config.json` 即可被 MCP 使用）。欢迎 PR —— 但请附上能跑的验证，我这里只有 Windows 环境。
+**现状**：
+
+- macOS / Linux 上 MCP 功能齐全（生成、多图、账号池、排队、`-set-session` 导入登录态）。
+- 没有内置扫码窗口——`sessionid` 是 HttpOnly，只能从浏览器里手动取；这属于「用起来麻烦一点」，不是「不能用」。
+- GUI 也能编译（`wails build`），但作者只有 Windows 环境，**GUI 在 mac/Linux 上的实际渲染与交互未经我验证**。如果你跑了，欢迎把结果/截图开 issue 反馈。
+
+想补上原生扫码登录的话，路径是：mac 用 `WKWebView` + `WKHTTPCookieStore` 取 cookie，Linux 用 WebKitGTK 的 `CookieManager`；接口已经按 `Options`/`Window`/`WaitLogin` 抽好，加一个 `window_darwin.go` 即可，不需要动上层。
 
 ## 开发
 
@@ -323,6 +366,13 @@ wails build        # 产出 build\bin\doubao-image-mcp.exe
 wails dev          # 热重载
 go build ./...     # 只编译后端
 go test ./internal/...   # 账号池 / 配置的单元测试
+```
+
+交叉编译自检（不需要 Mac 也能确认平台代码没断）：
+
+```bash
+GOOS=darwin  GOARCH=arm64 go build -o /tmp/mac .
+GOOS=linux   GOARCH=amd64 go build -o /tmp/linux .
 ```
 
 代码结构：
