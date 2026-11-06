@@ -81,9 +81,9 @@ MCP 对外提供 5 个工具：
 **macOS / Linux（命令行版）**：
 
 ```bash
-unzip doubao-image-mcp-v1.0.0-darwin-arm64-cli.zip -d doubao-image-mcp
+unzip doubao-image-mcp-v1.1.0-darwin-arm64-cli.zip -d doubao-image-mcp
 cd doubao-image-mcp && chmod +x doubao-image-mcp
-./doubao-image-mcp -set-session "<从浏览器复制的 sessionid>"
+./doubao-image-mcp -set-session "sessionid=…; ttwid=…"   # 整段 Cookie 直接粘，取法见下方
 ./doubao-image-mcp -mcp        # MCP 客户端拉起时用
 ```
 
@@ -104,20 +104,55 @@ wails build          # 产出 build\bin\doubao-image-mcp.exe
 
 ### 方式三：macOS / Linux
 
-MCP 本体（协议客户端、工具、账号池）是纯 Go，可以直接跑；**缺的只是 Windows 那个内置扫码窗口**，所以登录改成手动导入 `sessionid`。
+MCP 本体（协议客户端、工具、账号池）是纯 Go，可以直接跑；**缺的只是 Windows 那个内置扫码窗口**，所以登录改成复制一次 Cookie。
 
 ```bash
-# 需要 Go 1.22+
+# 需要 Go 1.22+（或者直接用 Release 里的 *-cli 包）
 go build -o doubao-image-mcp .
 
-# 1) 手动导入登录态：在浏览器登录豆包网页版，
-#    从开发者工具 → Application → Cookies 里复制 sessionid（可选 ttwid）
-#    导入时会顺带校验登录态、抓头像和昵称
-./doubao-image-mcp -set-session "<粘贴 sessionid>" -ttwid "<可选>"
+# 1) 把浏览器里的 Cookie 整段粘进来（导入时会校验登录态、抓头像昵称）
+./doubao-image-mcp -set-session "sessionid=xxxx; ttwid=yyyy; ..."
 
-# 2) 交给 MCP 客户端（stdio 模式）
+# 2) 交给 MCP 客户端
 ./doubao-image-mcp -mcp
 ```
+
+#### 怎么取 Cookie（三种都支持，任选一种）
+
+**① 复制整段 Cookie 请求头（最省事，不用自己找 sessionid）**
+
+1. 用浏览器打开 https://www.doubao.com 并登录
+2. 按 `F12` 打开开发者工具，切到 **Network / 网络** 面板
+3. 刷新页面（`F5`），在请求列表里点任意一条 `doubao.com` 的请求（比如 `chat` 或 `completion`）
+4. 右侧找到 **Request Headers / 请求标头** → 复制 `cookie:` 后面那一整行
+   （形如 `sessionid=7f3c…; ttwid=1%7C…; s_v_web_id=verify_…; …`）
+5. 把整行粘到 `-set-session` 后面：
+
+   ```bash
+   ./doubao-image-mcp -set-session "sessionid=7f3c…; ttwid=1%7C…; s_v_web_id=verify_…"
+   ```
+
+   带不带 `Cookie:` 前缀都行，多几个无关 cookie 也没关系——程序只认它需要的那些。
+
+**② 直接右键「Copy as cURL」**
+
+在 Network 面板里右键任意请求 → **Copy → Copy as cURL**，把整段命令原样粘进来：
+
+```bash
+./doubao-image-mcp -set-session "curl 'https://www.doubao.com/chat/' -H 'cookie: sessionid=7f3c…; ttwid=1%7C…'"
+```
+
+程序会自动从 cURL 里把 `cookie` 头抠出来。
+
+**③ 只复制 sessionid（最少信息）**
+
+1. 开发者工具 → **Application / 应用** → 左侧 **Cookies** → `https://www.doubao.com`
+2. 找到名为 `sessionid` 的那一行，复制 Value（通常 32 位十六进制）
+3. `./doubao-image-mcp -set-session "7f3c0d5e9a2b4c6d8e0f1a2b3c4d5e6f"`
+
+> `sessionid` 是 HttpOnly，浏览器控制台里 `document.cookie` 看不到，必须在 **Application → Cookies** 或 **Network → Request Headers** 里复制。
+>
+> 想用 GUI 的话，mac/Linux 上编译出的界面里「扫码登录」会变成同一个导入框，粘贴方式和上面一样。
 
 想要 GUI 的话：
 

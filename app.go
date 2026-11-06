@@ -406,14 +406,17 @@ func (a *App) CancelLogin() {
 	}
 }
 
-// ImportSession 手动导入 sessionid。
+// ImportSession 手动导入登录态。
 // 这是 mac / Linux 上的登录方式（那边没有内置 WebView2 扫码窗口）。
-func (a *App) ImportSession(sessionID, ttwid string) (string, error) {
-	sessionID = strings.TrimSpace(sessionID)
-	if sessionID == "" {
-		return "", errors.New("sessionid 不能为空")
+// 参数可以是一整段 Cookie（`sessionid=...; ttwid=...`）、cURL 命令，或者裸 sessionid。
+func (a *App) ImportSession(sessionInput, ttwid string) (string, error) {
+	cookies := config.ParseCookies(sessionInput)
+	if len(cookies) == 0 {
+		return "", errors.New("没解析到 cookie：请粘贴 sessionid，或整段 Cookie（sessionid=...; ttwid=...）")
 	}
-	cookies := map[string]string{"sessionid": sessionID}
+	if cookies["sessionid"] == "" {
+		return "", errors.New("粘贴的内容里没有 sessionid：请复制整段 Cookie，或单独填 sessionid")
+	}
 	if v := strings.TrimSpace(ttwid); v != "" {
 		cookies["ttwid"] = v
 	}
@@ -425,7 +428,7 @@ func (a *App) ImportSession(sessionID, ttwid string) (string, error) {
 	if err := a.store.SetActive(name); err != nil {
 		return name, err
 	}
-	a.logf("已导入账号 %s（手动 sessionid）", name)
+	a.logf("已导入账号 %s（%d 项 cookie，手动粘贴）", name, len(cookies))
 
 	client := doubao.New(cookies)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)

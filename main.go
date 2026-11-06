@@ -63,36 +63,41 @@ func main() {
 	runGUI()
 }
 
-// runSetSession 手动导入 sessionid 并落盘，供 mac / Linux（没有扫码登录窗口）使用。
-func runSetSession(sessionID, ttwid string) {
+// runSetSession 手动导入登录态：迁就 mac / Linux（那两平台没有扫码登录窗口）。
+// 参数可以是一整段 Cookie、cURL 命令，或者裸 sessionid。
+func runSetSession(input, ttwid string) {
 	logf := func(format string, args ...any) {
 		line := fmt.Sprintf(format, args...)
 		fmt.Printf("%s %s\n", time.Now().Format("15:04:05"), line)
 		fileLog(time.Now().Format("2006-01-02 15:04:05") + " " + line)
 	}
 
-	sessionID = strings.TrimSpace(sessionID)
-	if sessionID == "" {
-		logf("sessionid 不能为空")
+	cookies := config.ParseCookies(input)
+	if len(cookies) == 0 {
+		logf("没解析到 cookie：请粘贴 sessionid，或整段 Cookie（sessionid=...; ttwid=...）")
 		return
 	}
+	if cookies["sessionid"] == "" {
+		logf("粘贴的内容里没有 sessionid：请复制整段 Cookie，或单独填 sessionid")
+		return
+	}
+	if v := strings.TrimSpace(ttwid); v != "" {
+		cookies["ttwid"] = v
+	}
+
 	store, err := config.Load()
 	if err != nil {
 		logf("读取配置失败: %v", err)
 		return
 	}
 
-	cookies := map[string]string{"sessionid": sessionID}
-	if v := strings.TrimSpace(ttwid); v != "" {
-		cookies["ttwid"] = v
-	}
 	name := "manual-" + time.Now().Format("0102-150405")
 	if err := store.PutAccount(config.Account{Name: name, Cookies: cookies, AddedAt: time.Now()}); err != nil {
 		logf("保存账号失败: %v", err)
 		return
 	}
 	_ = store.SetActive(name)
-	logf("已保存账号 %s", name)
+	logf("已保存账号 %s（%d 项 cookie）", name, len(cookies))
 
 	client := doubao.New(cookies)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
