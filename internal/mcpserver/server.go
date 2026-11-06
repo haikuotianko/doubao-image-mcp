@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"doubao-image-mcp/internal/accountpool"
 	"doubao-image-mcp/internal/config"
 	"doubao-image-mcp/internal/doubao"
+	"doubao-image-mcp/internal/loginwin"
 )
 
 // Service 持有配置与日志，工具执行时按当前配置创建客户端。
@@ -113,18 +115,31 @@ type PingOutput struct {
 	Message string `json:"message"`
 }
 
+// LoginOutput 是 doubao_login 的返回值。
+type LoginOutput struct {
+	OK       bool   `json:"ok"`
+	Account  string `json:"account,omitempty"`
+	Nickname string `json:"nickname,omitempty"`
+	Message  string `json:"message"`
+}
+
 // NewServer 组装一个带全部工具的 MCP server（每次会话一个实例，但状态都在 store 里）。
 func (s *Service) NewServer() *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "doubao-image-mcp",
 		Version: "1.0.0",
 	}, &mcp.ServerOptions{
-		Instructions: "豆包网页版生图工具。先 doubao_ping 确认账号可用，再用 doubao_image 生成图片。",
+		Instructions: "豆包网页版生图工具。没有登录态时先调用 doubao_login 弹出扫码窗口，再用 doubao_image 生成图片；用 doubao_ping 检查登录态。",
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
+		Name:        "doubao_login",
+		Description: "弹出扫码登录窗口，让用户用豆包 App 扫码。没有账号、登录态失效、或 doubao_image 报「未登录」时调用它。",
+	}, s.handleLogin)
+
+	mcp.AddTool(server, &mcp.Tool{
 		Name:        "doubao_image",
-		Description: "用豆包网页版生成图片（文生图；给了 ref_images 就是图生图）。返回本地路径与图片链接。",
+		Description: "用豆包网页版生成图片（文生图；给了 ref_images 就是图生图）。返回本地路径与图片链接。没登录时先调 doubao_login。",
 	}, s.handleImage)
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -151,6 +166,109 @@ func (s *Service) NewServer() *mcp.Server {
 	}, s.handleAccounts)
 
 	return server
+}
+
+// handleLogin 直接从 MCP 进程弹窗扫码。
+//
+// stdio 模式下进程同样跑在用户桌面会话里，loginwin 又不依赖 Wails，
+// 所以这里能直接开 Win32 + WebView2 窗口，扫完把账号写进配置。
+func (s *Service) handleLogin(ctx context.Context, req *mcp.CallToolRequest, in struct{}) (*mcp.CallToolResult, LoginOutput, error) {
+	reply := func(out LoginOutput) (*mcp.CallToolResult, LoginOutput, error) {
+		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: out.Message}}}, out, nil
+	}
+
+	if !loginwin.Supported() {
+		return reply(LoginOutput{Message: "当前平台没有内置扫码登录窗口：请用 `doubao-image-mcp -set-session <sessionid>` 手动导入登录态"})
+	}
+
+	// 已经有可用账号就不打扰用户。
+	for _, acc := range s.store.EnabledAccounts() {
+		if acc.SessionID() != "" {
+			return reply(LoginOutput{OK: true, Account: acc.Name, Nickname: acc.Nickname,
+				Message: fmt.Sprintf("已经有可用账号 %s，无需登录", acc.Display())})
+		}
+	}
+
+	// 已有账号的 sessionid 不算这次登录成功（清 cookie 有延迟）。
+	skip := make(map[string]string)
+	for _, acc := range s.store.Get().Accounts {
+		if sid := acc.SessionID(); sid != "" {
+			skip[sid] = acc.Display()
+		}
+	}
+
+	s.logf("MCP 收到登录请求，打开扫码窗口")
+	win, err := loginwin.Open(loginwin.Options{
+		Logf:            s.logf,
+		PollInterval:    1500 * time.Millisecond,
+		ClearCookies:    true,
+		SkipSessions:    skip,
+	})
+	if err != nil {
+		return reply(LoginOutput{Message: "打不开登录窗口：" + err.Error()})
+	}
+	defer win.Close()
+
+	// 留 3 分钟扫码时间；客户端取消请求时窗口也会关掉。
+	waitCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel()
+	cookies, err := win.WaitLogin(waitCtx)
+	if err != nil {
+		if errors.Is(err, loginwin.ErrClosed) {
+			return reply(LoginOutput{Message: "扫码窗口被关掉了，没有完成登录"})
+		}
+		return reply(LoginOutput{Message: "没有等到扫码完成（" + err.Error() + "），可以再调一次 doubao_login"})
+	}
+
+	name := s.nameForSession(cookies)
+	account := config.Account{Name: name, Cookies: cookies, AddedAt: time.Now()}
+	if err := s.store.PutAccount(account); err != nil {
+		return reply(LoginOutput{Message: "扫码成功但保存账号失败：" + err.Error()})
+	}
+	_ = s.store.SetActive(name)
+	s.logf("扫码登录成功，已保存账号 %s（%d 项 cookie）", name, len(cookies))
+
+	out := LoginOutput{OK: true, Account: name, Message: fmt.Sprintf("登录成功，已保存账号 %s", name)}
+	pingCtx, pingCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer pingCancel()
+	client := s.clientForAccount(account)
+	if err := client.Ping(pingCtx); err != nil {
+		out.Message += "（登录态校验未通过：" + doubao.FormatError(err) + "）"
+		return reply(out)
+	}
+	if profile, err := client.FetchProfile(pingCtx); err == nil {
+		_ = s.store.UpdateProfile(name, profile.Nickname, profile.Avatar)
+		out.Nickname = profile.Nickname
+		if profile.Nickname != "" {
+			out.Message += "，昵称 " + profile.Nickname
+		}
+	}
+	return reply(out)
+}
+
+// nameForSession 复用同一 sessionid 的账号名，新账号则用时间戳并去重。
+func (s *Service) nameForSession(cookies map[string]string) string {
+	sid := cookies["sessionid"]
+	for _, acc := range s.store.Get().Accounts {
+		if sid != "" && acc.SessionID() == sid {
+			return acc.Name
+		}
+	}
+	base := "doubao-" + time.Now().Format("0102-150405")
+	name := base
+	for i := 2; ; i++ {
+		taken := false
+		for _, acc := range s.store.Get().Accounts {
+			if acc.Name == name {
+				taken = true
+				break
+			}
+		}
+		if !taken {
+			return name
+		}
+		name = fmt.Sprintf("%s-%d", base, i)
+	}
 }
 
 // clientFor 取当前账号并构造客户端；当前账号被停用或为空时退回第一个可调度账号。
