@@ -95,7 +95,7 @@ cd doubao-image-mcp && chmod +x doubao-image-mcp
 
 ```powershell
 go install github.com/wailsapp/wails/v2/cmd/wails@latest
-git clone <本仓库>
+git clone https://github.com/haikuotianko/doubao-image-mcp.git
 cd doubao-image-mcp
 wails build          # 产出 build\bin\doubao-image-mcp.exe
 ```
