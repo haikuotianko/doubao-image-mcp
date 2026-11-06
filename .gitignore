@@ -1,0 +1,30 @@
+# ---- 构建产物 ----
+build/bin/
+build/dist/
+*.exe
+*.exe.old
+*.syso
+
+# 图标草稿（build/appicon.png 与 build/windows/icon.ico 是成品，要保留）
+build/icon-candidates/
+
+# ---- 本机环境 / 运行数据（config.json 里有明文 cookie，绝不能提交）----
+acl-recovery/
+config.json
+*.log
+sse-dump.txt
+diag-*.txt
+
+# ---- 前端 ----
+node_modules/
+frontend/dist/
+
+# ---- 系统 / 编辑器 ----
+Thumbs.db
+desktop.ini
+.DS_Store
+.idea/
+.vscode/
+
+# Wails 用来判断 npm 依赖是否已安装的指纹文件：提交上去会让别人 clone 后跳过 npm install
+frontend/package.json.md5
