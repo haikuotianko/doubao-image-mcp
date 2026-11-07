@@ -202,6 +202,34 @@ button.danger { color: var(--err); border-color: rgba(239, 95, 95, .4); }
 
 button.sm { padding: 3px 9px; font-size: 12px; border-radius: 6px; }
 
+/* 请求中的按钮：右侧留出转圈的位置，避免文字被盖住。
+   放在 button.sm 之后，否则 padding 会被后者覆盖。 */
+button.loading {
+  position: relative;
+  padding-right: 26px;
+  opacity: .85;
+}
+
+button.loading::after {
+  content: '';
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  margin-top: -5px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: btn-spin .7s linear infinite;
+}
+
+button.sm.loading { padding-right: 26px; }
+
+@keyframes btn-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* 卡片标题行：标题 + 右侧操作按钮 */
 .card-head {
   display: flex;

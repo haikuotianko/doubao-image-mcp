@@ -33,6 +33,8 @@ document.querySelector('#app').innerHTML = `
 <header>
   <h1>豆包生图 MCP <span class="ver" id="appVersion"></span></h1>
   <span class="badge off" id="accountBadge">未登录</span>
+  <span class="spacer"></span>
+  <button class="sm" id="btnCheckUpdate" title="向 GitHub 查询最新版本">检查更新</button>
 </header>
 
 <div class="update-bar" id="updateBar" style="display:none">
@@ -417,6 +419,43 @@ async function checkUpdate() {
   }
 }
 
+// 手动「检查更新」按钮：点了就去问 GitHub，检查期间按钮转圈并禁用。
+async function manualCheckUpdate() {
+  const btn = el('btnCheckUpdate');
+  if (btn.dataset.busy === '1') return;
+
+  btn.dataset.busy = '1';
+  btn.disabled = true;
+  btn.classList.add('loading');
+  btn.textContent = '检查中';
+
+  let label = '检查更新';
+  try {
+    const info = await CheckUpdate();
+    if (info && info.newer) {
+      // 手动检查说明用户想升级，把之前「忽略此版本」的记录清掉
+      localStorage.removeItem(DISMISS_KEY);
+      showUpdateBar(info);
+      label = '有新版本';
+    } else if (info) {
+      label = '已是最新';
+    }
+  } catch (err) {
+    // 失败详情后端已经写进日志（会以 log 事件推到界面上），这里只改按钮文字
+    console.info('检查更新失败：', err);
+    label = '检查失败';
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+    btn.textContent = label;
+    btn.dataset.busy = '';
+    // 两秒后恢复默认文字，按钮不会一直停在结果上
+    setTimeout(() => {
+      if (btn.dataset.busy !== '1') btn.textContent = '检查更新';
+    }, 2000);
+  }
+}
+
 // ---------------------------------------------------------------- 交互
 
 async function run(fn, okMessage) {
@@ -623,6 +662,8 @@ el('btnTest').onclick = async () => {
     el('btnTest').disabled = false;
   }
 };
+
+el('btnCheckUpdate').onclick = manualCheckUpdate;
 
 EventsOn('log', (line) => appendLog(line));
 
