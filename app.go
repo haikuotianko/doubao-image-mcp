@@ -19,6 +19,8 @@ import (
 	"doubao-image-mcp/internal/doubao"
 	"doubao-image-mcp/internal/loginwin"
 	"doubao-image-mcp/internal/mcpserver"
+	"doubao-image-mcp/internal/update"
+	"doubao-image-mcp/internal/version"
 )
 
 // App struct
@@ -47,7 +49,7 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-	a.logf("启动 豆包生图 MCP")
+	a.logf("启动 豆包生图 MCP %s", version.Current())
 
 	store, err := config.Load()
 	if err != nil {
@@ -115,6 +117,7 @@ type Status struct {
 	AutoStartHTTP bool           `json:"autoStartHttp"`
 	ConfigPath    string         `json:"configPath"`
 	ExePath       string         `json:"exePath"`
+	AppVersion    string         `json:"appVersion"`
 	Platform      string         `json:"platform"`
 	LoginSupport  bool           `json:"loginSupported"`
 	Models        []doubao.Model `json:"models"`
@@ -138,6 +141,7 @@ func (a *App) Status() Status {
 		AutoStartHTTP: cfg.AutoStartHTTP,
 		ConfigPath:    config.Path(),
 		ExePath:       exePath(),
+		AppVersion:    version.Current(),
 		Platform:      runtime.GOOS,
 		LoginSupport:  loginwin.Supported(),
 		Models:        doubao.Models,
@@ -165,6 +169,52 @@ func (a *App) Status() Status {
 		})
 	}
 	return st
+}
+
+// UpdateInfo 是「检查更新」的结果。
+type UpdateInfo struct {
+	Current   string `json:"current"`
+	Latest    string `json:"latest"`
+	Newer     bool   `json:"newer"`
+	URL       string `json:"url"`
+	Name      string `json:"name"`
+	Published string `json:"published"`
+}
+
+// CheckUpdate 直接问 GitHub 上最新的 Release 与本机版本比一比，
+// 不需要自建更新服务器。失败（断网、限流）时原样返回错误，界面只做提示。
+func (a *App) CheckUpdate() (UpdateInfo, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	res, err := update.Check(ctx, version.Current())
+	info := UpdateInfo{
+		Current:   res.Current,
+		Latest:    res.Latest,
+		Newer:     res.Newer,
+		URL:       res.URL,
+		Name:      res.Name,
+		Published: res.Published,
+	}
+	if err != nil {
+		a.logf("检查更新失败: %v", err)
+		return info, err
+	}
+	if res.Newer {
+		a.logf("发现新版本 %s（当前 %s）", res.Latest, res.Current)
+	} else {
+		a.logf("已是最新版本 %s", res.Current)
+	}
+	return info, nil
+}
+
+// OpenURL 用系统默认浏览器打开网址（更新提示里的下载页）。
+func (a *App) OpenURL(url string) error {
+	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+		return errors.New("只允许打开 http/https 链接")
+	}
+	wailsruntime.BrowserOpenURL(a.ctx, url)
+	return nil
 }
 
 // Settings 是前端可改的配置项。

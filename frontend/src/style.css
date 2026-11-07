@@ -50,6 +50,29 @@ header h1 {
 
 header .spacer { flex: 1; }
 
+/* 标题后面的版本号 */
+header h1 .ver {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: 4px;
+}
+
+/* 新版本提示条：贴在 header 下面，不挤占左右两栏 */
+.update-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 18px;
+  background: rgba(76, 141, 255, .14);
+  border-bottom: 1px solid rgba(76, 141, 255, .45);
+  font-size: 13px;
+  flex: 0 0 auto;
+}
+
+.update-bar b { color: var(--accent); }
+.update-bar .update-actions { margin-left: auto; display: flex; gap: 8px; }
+
 .badge {
   font-size: 12px;
   padding: 3px 9px;

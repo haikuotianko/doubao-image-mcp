@@ -123,6 +123,7 @@ export namespace main {
 	    autoStartHttp: boolean;
 	    configPath: string;
 	    exePath: string;
+	    appVersion: string;
 	    platform: string;
 	    loginSupported: boolean;
 	    models: doubao.Model[];
@@ -149,6 +150,7 @@ export namespace main {
 	        this.autoStartHttp = source["autoStartHttp"];
 	        this.configPath = source["configPath"];
 	        this.exePath = source["exePath"];
+	        this.appVersion = source["appVersion"];
 	        this.platform = source["platform"];
 	        this.loginSupported = source["loginSupported"];
 	        this.models = this.convertValues(source["models"], doubao.Model);
@@ -208,6 +210,28 @@ export namespace main {
 		    }
 		    return a;
 		}
+	}
+	export class UpdateInfo {
+	    current: string;
+	    latest: string;
+	    newer: boolean;
+	    url: string;
+	    name: string;
+	    published: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.current = source["current"];
+	        this.latest = source["latest"];
+	        this.newer = source["newer"];
+	        this.url = source["url"];
+	        this.name = source["name"];
+	        this.published = source["published"];
+	    }
 	}
 
 }

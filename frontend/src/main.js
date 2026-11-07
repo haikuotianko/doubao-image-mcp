@@ -2,10 +2,12 @@ import './style.css';
 
 import {EventsOn} from '../wailsjs/runtime/runtime';
 import {
+    CheckUpdate,
     ChooseOutDir,
     ImportSession,
     LoginDialog,
     OpenOutDir,
+    OpenURL,
     RemoveAccount,
     ReorderAccounts,
     SaveImageAs,
@@ -29,9 +31,17 @@ const el = (id) => document.getElementById(id);
 
 document.querySelector('#app').innerHTML = `
 <header>
-  <h1>豆包生图 MCP</h1>
+  <h1>豆包生图 MCP <span class="ver" id="appVersion"></span></h1>
   <span class="badge off" id="accountBadge">未登录</span>
 </header>
+
+<div class="update-bar" id="updateBar" style="display:none">
+  <span id="updateText"></span>
+  <span class="update-actions">
+    <button class="primary sm" id="btnGoDownload">去下载</button>
+    <button class="sm" id="btnSkipVersion">忽略此版本</button>
+  </span>
+</div>
 
 <main>
   <div class="col">
@@ -287,6 +297,7 @@ function fillSelect(select, options, value) {
 function renderStatus(status) {
   state.status = status;
   renderAccounts(status);
+  renderVersion(status.appVersion);
 
   el('outDir').value = status.outDir || '';
   el('httpAddr').value = status.httpAddr || '';
@@ -365,6 +376,45 @@ function escapeHtml(text) {
   return String(text == null ? '' : text).replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
+}
+
+// ---------------------------------------------------------------- 版本与更新
+
+const DISMISS_KEY = 'doubao.dismissedUpdate';
+let updateChecked = false;
+
+function renderVersion(v) {
+  const text = !v || v === 'dev' ? '开发版' : (v.startsWith('v') ? v : 'v' + v);
+  el('appVersion').textContent = text;
+}
+
+function showUpdateBar(info) {
+  el('updateText').innerHTML = `发现新版本 <b>${escapeHtml(info.latest)}</b>` +
+      (info.published ? `（${escapeHtml(info.published)} 发布）` : '') +
+      `，当前是 ${escapeHtml(info.current)}。`;
+  el('updateBar').style.display = '';
+  el('btnGoDownload').onclick = () => OpenURL(info.url);
+  el('btnSkipVersion').onclick = () => {
+    localStorage.setItem(DISMISS_KEY, info.latest || '');
+    el('updateBar').style.display = 'none';
+    appendLog('已忽略版本 ' + info.latest + '，下次发版还会提醒');
+  };
+}
+
+// 启动时静默查一次 GitHub Releases：不阻塞界面，失败只写日志。
+// 忽略过的版本不再提示，直到线上出现更新的版本。
+async function checkUpdate() {
+  if (updateChecked) return;
+  updateChecked = true;
+  try {
+    const info = await CheckUpdate();
+    if (!info || !info.newer) return;
+    if (localStorage.getItem(DISMISS_KEY) === info.latest) return;
+    showUpdateBar(info);
+  } catch (err) {
+    // 断网 / 限流都正常，不当成错误打扰用户
+    console.info('检查更新失败：', err);
+  }
 }
 
 // ---------------------------------------------------------------- 交互
@@ -576,4 +626,4 @@ el('btnTest').onclick = async () => {
 
 EventsOn('log', (line) => appendLog(line));
 
-refresh();
+refresh().then(checkUpdate);

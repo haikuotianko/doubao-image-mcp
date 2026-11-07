@@ -10,6 +10,10 @@ export function CheckAccount() {
   return window['go']['main']['App']['CheckAccount']();
 }
 
+export function CheckUpdate() {
+  return window['go']['main']['App']['CheckUpdate']();
+}
+
 export function ChooseOutDir() {
   return window['go']['main']['App']['ChooseOutDir']();
 }
@@ -32,6 +36,10 @@ export function Logs() {
 
 export function OpenOutDir() {
   return window['go']['main']['App']['OpenOutDir']();
+}
+
+export function OpenURL(arg1) {
+  return window['go']['main']['App']['OpenURL'](arg1);
 }
 
 export function RefreshProfile(arg1) {

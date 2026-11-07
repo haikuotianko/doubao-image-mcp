@@ -20,6 +20,7 @@ import (
 	"doubao-image-mcp/internal/config"
 	"doubao-image-mcp/internal/doubao"
 	"doubao-image-mcp/internal/loginwin"
+	"doubao-image-mcp/internal/version"
 )
 
 // Service 持有配置与日志，工具执行时按当前配置创建客户端。
@@ -127,7 +128,7 @@ type LoginOutput struct {
 func (s *Service) NewServer() *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "doubao-image-mcp",
-		Version: "1.0.0",
+		Version: version.Current(),
 	}, &mcp.ServerOptions{
 		Instructions: "豆包网页版生图工具。没有登录态时先调用 doubao_login 弹出扫码窗口，再用 doubao_image 生成图片；用 doubao_ping 检查登录态。",
 	})

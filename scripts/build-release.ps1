@@ -36,7 +36,7 @@ $winTargets = @(
 )
 
 foreach ($t in $winTargets) {
-    & wails build -platform "windows/$($t.arch)" -o doubao-image-mcp.exe | Out-Null
+    & wails build -platform "windows/$($t.arch)" -o doubao-image-mcp.exe -ldflags "-X doubao-image-mcp/internal/version.Version=$Version" | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "windows/$($t.arch) 构建失败" }
     New-Package (Join-Path $root 'build\bin\doubao-image-mcp.exe') 'doubao-image-mcp.exe' $t.suffix
 }
@@ -57,7 +57,7 @@ foreach ($t in $cliTargets) {
     $env:GOOS = $t.os
     $env:GOARCH = $t.arch
     $env:CGO_ENABLED = '0'
-    & go build -trimpath -ldflags '-s -w' -o $out .
+    & go build -trimpath -ldflags "-s -w -X doubao-image-mcp/internal/version.Version=$Version" -o $out .
     $code = $LASTEXITCODE
     Remove-Item Env:GOOS, Env:GOARCH, Env:CGO_ENABLED -ErrorAction SilentlyContinue
     if ($code -ne 0) { throw "$($t.os)/$($t.arch) 构建失败" }
@@ -67,7 +67,7 @@ foreach ($t in $cliTargets) {
 
 Write-Host "== 恢复本地开发版为 windows/amd64"
 # 上面最后一个 wails 构建是 arm64，这里重建一次，保证 build\bin 里是常用的 x64
-& wails build -platform "windows/amd64" -o doubao-image-mcp.exe | Out-Null
+& wails build -platform "windows/amd64" -o doubao-image-mcp.exe -ldflags "-X doubao-image-mcp/internal/version.Version=$Version" | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "windows/amd64 重建失败" }
 
 Write-Host "== 结束，产物在 build\dist\"

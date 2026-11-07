@@ -19,6 +19,8 @@ import (
 	"doubao-image-mcp/internal/doubao"
 	"doubao-image-mcp/internal/loginwin"
 	"doubao-image-mcp/internal/mcpserver"
+	"doubao-image-mcp/internal/update"
+	"doubao-image-mcp/internal/version"
 )
 
 //go:embed all:frontend/dist
@@ -34,7 +36,18 @@ func main() {
 	viewMode := flag.Bool("view", false, "用当前账号的会话打开浏览器窗口（等同 GUI 的「查看会话」）")
 	setSession := flag.String("set-session", "", "手动导入 sessionid（mac/Linux 没有扫码登录窗口时用）")
 	ttwidFlag := flag.String("ttwid", "", "配合 -set-session 的可选 ttwid")
+	versionFlag := flag.Bool("version", false, "打印版本号后退出")
+	checkUpdate := flag.Bool("check-update", false, "检查 GitHub 上有没有新版本后退出")
 	flag.Parse()
+
+	if *versionFlag {
+		fmt.Printf("豆包生图 MCP %s\n", version.Current())
+		return
+	}
+	if *checkUpdate {
+		runCheckUpdate()
+		return
+	}
 
 	if *setSession != "" {
 		runSetSession(*setSession, *ttwidFlag)
@@ -61,6 +74,36 @@ func main() {
 		return
 	}
 	runGUI()
+}
+
+// runCheckUpdate 命令行版「检查更新」：问 GitHub 最新的 Release 与本机版本比一比。
+// 只读接口，不上传任何东西；没网或限流时如实说明，不当成错误退出。
+func runCheckUpdate() {
+	current := version.Current()
+	fmt.Printf("当前版本: %s\n", current)
+	if version.IsDev() {
+		fmt.Printf("这是开发构建（没注入版本号），跳过比较。\n")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	res, err := update.Check(ctx, current)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "检查更新失败: %v\n", err)
+		fmt.Fprintf(os.Stderr, "可以手动打开 %s 看看\n", update.ReleasesPage)
+		return
+	}
+
+	fmt.Printf("最新版本: %s", res.Latest)
+	if res.Published != "" {
+		fmt.Printf("（%s 发布）", res.Published)
+	}
+	fmt.Println()
+	if res.Newer {
+		fmt.Printf("有新版本可用，下载地址: %s\n", res.URL)
+	} else {
+		fmt.Println("已经是最新版本。")
+	}
 }
 
 // runSetSession 手动导入登录态：迁就 mac / Linux（那两平台没有扫码登录窗口）。

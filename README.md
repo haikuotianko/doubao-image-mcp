@@ -12,6 +12,8 @@
 
 - [它能做什么](#它能做什么)
 - [环境要求](#环境要求)
+- [下载](#下载)
+- [版本与更新检查](#版本与更新检查)
 - [安装](#安装)
 - [首次使用](#首次使用)
 - [接入 MCP 客户端](#接入-mcp-客户端)
@@ -67,6 +69,36 @@ MCP 对外提供 5 个工具：
 
 > **命令行版**包含 `-mcp`（stdio）、`-http`、`-set-session`、`-diagnose`、`-view` 等全部命令，只是没有图形界面。
 > 每个包都是「可执行文件 + README + LICENSE」，解压即用。mac/Linux 上首次运行可能需要 `chmod +x doubao-image-mcp`。
+
+## 版本与更新检查
+
+**不需要任何服务器**，直接用 GitHub 的版本管理当更新源。
+
+- GUI 启动时会静默请求一次 GitHub 的最新 Release，发现新版本就在顶部弹一条提示（「去下载」直接开浏览器，「忽略此版本」记在本地，下次发版还会提醒）。
+- 命令行也能查：
+
+  ```powershell
+  .\doubao-image-mcp.exe -version         # 当前版本
+  .\doubao-image-mcp.exe -check-update    # 有没有新版本
+  ```
+
+原理就一句话：
+
+```
+GET https://api.github.com/repos/haikuotianko/doubao-image-mcp/releases/latest
+→ 取 tag_name（如 v1.2.0）与二进制里编译进去的版本号比较
+```
+
+细节：
+
+| 事项 | 说明 |
+| --- | --- |
+| 版本号来源 | 打包时用 `-ldflags "-X doubao-image-mcp/internal/version.Version=v1.2.0"` 注入；`go build` 不注入就是 `dev`，**开发版不提示更新** |
+| 限流 | 未认证的 GitHub API 每小时 60 次（按 IP 计），启动查一次完全够用；超了只会「检查失败」，不影响生图 |
+| 断网 / 失败 | 只写日志，不弹框打扰；GUI 与 `-mcp` 模式都不受影响 |
+| 想自己改成别的更新源 | 改 `internal/update/update.go` 里的 `Repo` 常量，或换成读取仓库内静态 JSON（raw.githubusercontent.com 不限流） |
+
+> 版本号比较规则：按 `主.次.修订` 逐段比数字（`v1.10.0` > `v1.9.0`），同号时正式版高于预发布版（`v1.2.0` > `v1.2.0-beta`）。
 
 ## 安装
 
@@ -403,6 +435,8 @@ mac/Linux 上的 GUI 里，「扫码登录」按钮会换成**手动导入 sessi
 .\doubao-image-mcp.exe -login -login-url about:blank   # 换个地址，验证窗口本身是否正常
 .\doubao-image-mcp.exe -view                   # 用默认账号的会话开浏览器窗口
 .\doubao-image-mcp.exe -diagnose               # 环境自检
+.\doubao-image-mcp.exe -version                # 打印当前版本
+.\doubao-image-mcp.exe -check-update           # 查 GitHub 上有没有新版本
 ```
 
 ### 生成失败
@@ -483,6 +517,8 @@ internal/accountpool     账号调度：按优先级取空闲账号，全忙排�
 internal/doubao          豆包协议客户端（SSE 解析、多图归并、图生图、上传、比例修正、资料抓取）
 internal/loginwin        原生 Win32 + WebView2 登录窗口（取 HttpOnly cookie、错误页、空白探针）
 internal/mcpserver       MCP 工具定义（stdio / streamable HTTP）
+internal/update          GitHub Releases 版本检查与版本号比较（不需要自建服务器）
+internal/version         构建时用 -ldflags 注入的版本号
 frontend/                Vanilla JS + vite
 ```
 

@@ -6,6 +6,8 @@ export function CancelLogin():Promise<void>;
 
 export function CheckAccount():Promise<string>;
 
+export function CheckUpdate():Promise<main.UpdateInfo>;
+
 export function ChooseOutDir():Promise<string>;
 
 export function HTTPRunning():Promise<boolean>;
@@ -17,6 +19,8 @@ export function LoginDialog():Promise<main.LoginResult>;
 export function Logs():Promise<Array<string>>;
 
 export function OpenOutDir():Promise<void>;
+
+export function OpenURL(arg1:string):Promise<void>;
 
 export function RefreshProfile(arg1:string):Promise<void>;
 

@@ -387,6 +387,10 @@ cd doubao-image-mcp &amp;&amp; chmod +x doubao-image-mcp
       <p>多半是 WebView2 运行时缺失、代理或网络问题。跑一次 <code>doubao-image-mcp.exe -diagnose</code>，报告会生成在配置目录里，含系统版本、WebView2 版本、代理与连通性检测结果。</p>
     </details>
     <details>
+      <summary>有新版本了怎么知道？</summary>
+      <p>不需要订阅任何东西：程序启动时会静默查一次 GitHub 的最新 Release，有新版本就在顶部弹提示，点「去下载」直接打开下载页。命令行也可以 <code>doubao-image-mcp.exe -check-update</code>。全部走 GitHub 自带的版本管理，没有自建更新服务器。</p>
+    </details>
+    <details>
       <summary>多个客户端同时用会怎样？</summary>
       <p>stdio 模式下每个客户端会拉起自己的进程，队列不共享；要严格串行就用 HTTP 模式，由同一个进程统一调度。</p>
     </details>
