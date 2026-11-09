@@ -199,6 +199,7 @@ func parseImageAbilitySSE(raw string, req Request) (*Result, error) {
 		res.Model = DefaultModelName()
 	}
 	var noticeHits []string
+	var ids convIDs
 
 	for _, ev := range parseSSE(raw) {
 		if ev.Name == "STREAM_ERROR" || ev.Name == "gateway-error" {
@@ -217,6 +218,11 @@ func parseImageAbilitySSE(raw string, req Request) (*Result, error) {
 				msg = asString(d["msg"])
 			}
 			return nil, newErr(classifyCode(code), "生成图片", code, "服务端返回错误", msg+" "+ev.Data)
+		}
+		// 会话线索可能在任意事件里（ack_client_meta 那帧的事件名不在生图白名单里），
+		// 所以先提取，再按事件类型筛图片内容。
+		if d := jsonObject(ev.Data); d != nil {
+			ids.pick(d)
 		}
 		if ev.Name != "STREAM_CHUNK" && ev.Name != "FULL_MSG_NOTIFY" && ev.Name != "STREAM_MSG_NOTIFY" {
 			continue
@@ -243,6 +249,7 @@ func parseImageAbilitySSE(raw string, req Request) (*Result, error) {
 
 	// 全文兜底：按图合并无水印直链，并补回结构化解析漏掉的图（多图时一张都不能少）。
 	res.Images = dedupeImages(mergeWatermarkFree(res.Images, raw))
+	ids.apply(res)
 	extractConversation(raw, res)
 	if len(noticeHits) > 0 && len(res.Images) == 0 {
 		res.Notice = "当前账号无该模型的创作额度（服务端返回订阅提示：" +
@@ -287,13 +294,80 @@ func dedupeStrings(in []string) []string {
 	return out
 }
 
-// 从 SSE 原文里提取会话 id / section id。
-// 响应里 ack_client_meta 会带上真正的 conversation_id（新建对话时就是新分配的那个），
-// 后面各帧的 message.conversation_id 与它一致，取第一处即可。
+// 从 SSE 原文里提取会话 id / section id（兜底手段）。
+// 结构化解析不到时才用：正则取的是全文第一处，理论上可能命中别的对话 id。
 var (
 	conversationIDRe = regexp.MustCompile(`"conversation_id"\s*:\s*"(\d+)"`)
 	sectionIDRe      = regexp.MustCompile(`"section_id"\s*:\s*"(\d+)"`)
 )
+
+// convIDs 收集一帧一帧里的会话线索，最后按优先级决定用哪个：
+// ack_client_meta（服务端确认的那一帧）> message/meta 里的会话信息 > 全文正则兜底。
+type convIDs struct {
+	ackConv, ackSection string
+	msgConv, msgSection string
+}
+
+// pickConversation 从单帧 JSON 里取会话 id（只记录，不直接写进结果）。
+func (c *convIDs) pick(d map[string]any) {
+	if d == nil {
+		return
+	}
+	if ack := findMapByKey(d, "ack_client_meta", 6); ack != nil {
+		if c.ackConv == "" {
+			c.ackConv = asString(ack["conversation_id"])
+		}
+		if c.ackSection == "" {
+			c.ackSection = asString(ack["section_id"])
+		}
+	}
+	if c.msgConv == "" {
+		if msg := asMap(d["message"]); msg != nil {
+			c.msgConv = asString(msg["conversation_id"])
+		}
+	}
+	if c.msgSection == "" {
+		if meta := asMap(d["meta"]); meta != nil {
+			c.msgSection = asString(meta["section_id"])
+		}
+	}
+}
+
+// apply 把收集到的 id 按优先级写进结果。
+func (c *convIDs) apply(res *Result) {
+	switch {
+	case c.ackConv != "":
+		res.ConversationID = c.ackConv
+	case c.msgConv != "":
+		res.ConversationID = c.msgConv
+	}
+	switch {
+	case c.ackSection != "":
+		res.SectionID = c.ackSection
+	case c.msgSection != "":
+		res.SectionID = c.msgSection
+	}
+}
+
+// findMapByKey 在嵌套 JSON 里按 key 找第一个对象（深度有限，避免遍历过大）。
+func findMapByKey(v any, key string, depth int) map[string]any {
+	if depth <= 0 {
+		return nil
+	}
+	m := asMap(v)
+	if m == nil {
+		return nil
+	}
+	if inner := asMap(m[key]); inner != nil {
+		return inner
+	}
+	for _, child := range m {
+		if sub := findMapByKey(child, key, depth-1); sub != nil {
+			return sub
+		}
+	}
+	return nil
+}
 
 func extractConversation(raw string, res *Result) {
 	if res.ConversationID == "" {
