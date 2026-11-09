@@ -101,7 +101,7 @@ GET https://api.github.com/repos/haikuotianko/doubao-image-mcp/releases/latest
 | 断网 / 失败 | 只写日志，不弹框打扰；GUI 与 `-mcp` 模式都不受影响 |
 | 想自己改成别的更新源 | 改 `internal/update/update.go` 里的 `Repo` 常量，或换成读取仓库内静态 JSON（raw.githubusercontent.com 不限流） |
 
-> 版本号比较规则：按 `主.次.修订` 逐段比数字（`v1.10.0` > `v1.9.0`），同号时正式版高于预发布版（`v1.3.0` > `v1.3.0-beta`）。
+> 版本号比较规则：按 `主.次.修订` 逐段比数字（`v1.10.0` > `v1.9.0`），同号时正式版高于预发布版（`v1.4.0` > `v1.4.0-beta`）。
 
 ## 安装
 
@@ -118,7 +118,7 @@ GET https://api.github.com/repos/haikuotianko/doubao-image-mcp/releases/latest
 **macOS / Linux（命令行版）**：
 
 ```bash
-unzip doubao-image-mcp-v1.3.0-macos-arm64-cli.zip -d doubao-image-mcp
+unzip doubao-image-mcp-v1.4.0-macos-arm64-cli.zip -d doubao-image-mcp
 cd doubao-image-mcp && chmod +x doubao-image-mcp
 ./doubao-image-mcp -set-session "sessionid=…; ttwid=…"   # 整段 Cookie 直接粘，取法见下方
 ./doubao-image-mcp -mcp        # MCP 客户端拉起时用
@@ -508,14 +508,14 @@ MCP 主体是纯 Go（`internal/doubao` 协议客户端、`internal/mcpserver` �
 一键打完所有包：
 
 ```powershell
-powershell -File scripts\build-release.ps1 -Version v1.3.0
+powershell -File scripts\build-release.ps1 -Version v1.4.0
 ```
 
 发版后官网的下载列表要跟着更新（官网读的是仓库里的静态 `docs/latest.json`，不实时查 GitHub API，避免 60 次/小时的限流）：
 
 ```powershell
 powershell -File scripts\update-latest.ps1            # 取最新 Release
-powershell -File scripts\update-latest.ps1 -Tag v1.3.0 # 或指定版本
+powershell -File scripts\update-latest.ps1 -Tag v1.4.0 # 或指定版本
 git add docs/latest.json && git commit -m "docs: 更新 latest.json" && git push
 ```
 
