@@ -42,6 +42,9 @@ type Result struct {
 	Notice string `json:"notice,omitempty"`
 	// Channel 记录实际生效的通道：ability / samantha。
 	Channel string `json:"channel"`
+	// ConversationID / SectionID 是这次请求落到的对话，供下次在同一对话里继续。
+	ConversationID string `json:"conversationId,omitempty"`
+	SectionID      string `json:"sectionId,omitempty"`
 }
 
 // Request 是一次生图请求。
@@ -56,6 +59,12 @@ type Request struct {
 	OutDir string
 	// FitRatio 为真时把结果裁剪/补边到请求比例。
 	FitRatio bool
+	// ConversationID 非空时在这个已有对话里继续生成，不再新建对话。
+	ConversationID string
+	// SectionID 是上一次生成返回的 section（继续对话时带回，服务端靠它定位上下文）。
+	SectionID string
+	// ContextMode 控制复用对话时是否用提示词隔开上下文：none / always / auto。
+	ContextMode string
 	// Timeout 覆盖默认超时。
 	Timeout time.Duration
 }

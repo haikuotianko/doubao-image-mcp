@@ -83,6 +83,17 @@ document.querySelector('#app').innerHTML = `
           <input type="checkbox" id="fitRatio" style="width:auto;margin-right:6px" />
           结果图裁剪/补边到请求比例
         </label>
+        <label>复用对话</label>
+        <label style="color:var(--text)">
+          <input type="checkbox" id="reuseChat" style="width:auto;margin-right:6px" />
+          一直在同一个对话里生图（失败自动换新对话）
+        </label>
+        <label>上下文隔离</label>
+        <select id="contextMode">
+          <option value="auto">自动：由模型判断是否沿用上文</option>
+          <option value="always">每次隔离：明确要求忽略上文</option>
+          <option value="none">不隔离：完全沿用上文</option>
+        </select>
         <label>HTTP 地址</label>
         <input type="text" id="httpAddr" placeholder="127.0.0.1:8770" />
         <label>自动启动</label>
@@ -305,6 +316,8 @@ function renderStatus(status) {
   el('httpAddr').value = status.httpAddr || '';
   el('fitRatio').checked = !!status.fitRatio;
   el('autoStartHttp').checked = !!status.autoStartHttp;
+  el('reuseChat').checked = !!status.reuseChat;
+  el('contextMode').value = status.contextMode || 'auto';
 
   const models = (status.models || []).map((m) => ({
     value: m.name,
@@ -613,6 +626,8 @@ el('btnSave').onclick = async () => {
     defaultRatio: el('defaultRatio').value,
     defaultStyle: el('defaultStyle').value,
     fitRatio: el('fitRatio').checked,
+    reuseChat: el('reuseChat').checked,
+    contextMode: el('contextMode').value,
     httpAddr: el('httpAddr').value,
     autoStartHttp: el('autoStartHttp').checked,
   };
@@ -648,6 +663,18 @@ el('btnTest').onclick = async () => {
         el('testAccount').value);
     const images = (result.images || []).filter((img) => img.url);
     el('testMsg').textContent = `${result.message || ''}${images.length > 1 ? `（点任意一张看大图）` : ''}`;
+    // 把这次落到的对话链接放出来，点一下就能在浏览器里看（豆包网页版的对话地址）
+    if (result.chatUrl) {
+      const link = document.createElement('a');
+      link.href = '#';
+      link.textContent = '打开对话 ↗';
+      link.style.marginLeft = '10px';
+      link.onclick = (e) => {
+        e.preventDefault();
+        OpenURL(result.chatUrl);
+      };
+      el('testMsg').appendChild(link);
+    }
     for (const img of images) {
       const im = document.createElement('img');
       im.src = img.url;

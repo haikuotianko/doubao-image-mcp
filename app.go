@@ -115,6 +115,8 @@ type Status struct {
 	DefaultStyle  string         `json:"defaultStyle"`
 	FitRatio      bool           `json:"fitRatio"`
 	AutoStartHTTP bool           `json:"autoStartHttp"`
+	ReuseChat     bool           `json:"reuseChat"`
+	ContextMode   string         `json:"contextMode"`
 	ConfigPath    string         `json:"configPath"`
 	ExePath       string         `json:"exePath"`
 	AppVersion    string         `json:"appVersion"`
@@ -139,6 +141,8 @@ func (a *App) Status() Status {
 		DefaultStyle:  cfg.DefaultStyle,
 		FitRatio:      cfg.FitRatio,
 		AutoStartHTTP: cfg.AutoStartHTTP,
+		ReuseChat:     cfg.ReuseChat(),
+		ContextMode:   cfg.ContextMode,
 		ConfigPath:    config.Path(),
 		ExePath:       exePath(),
 		AppVersion:    version.Current(),
@@ -226,6 +230,8 @@ type Settings struct {
 	FitRatio      bool   `json:"fitRatio"`
 	HTTPAddr      string `json:"httpAddr"`
 	AutoStartHTTP bool   `json:"autoStartHttp"`
+	ReuseChat     bool   `json:"reuseChat"`
+	ContextMode   string `json:"contextMode"`
 }
 
 // SaveSettings 落盘配置。
@@ -242,6 +248,10 @@ func (a *App) SaveSettings(s Settings) error {
 			cfg.HTTPAddr = strings.TrimSpace(s.HTTPAddr)
 		}
 		cfg.AutoStartHTTP = s.AutoStartHTTP
+		cfg.NoReuseChat = !s.ReuseChat
+		if strings.TrimSpace(s.ContextMode) != "" {
+			cfg.ContextMode = doubao.NormalizeContextMode(s.ContextMode)
+		}
 	})
 }
 
@@ -631,6 +641,8 @@ type TestResult struct {
 	OK      bool                  `json:"ok"`
 	Message string                `json:"message"`
 	Images  []mcpserver.ImageItem `json:"images"`
+	ChatID  string                `json:"chatId,omitempty"`
+	ChatURL string                `json:"chatUrl,omitempty"`
 }
 
 // TestImage 用一份短 prompt 试跑一次生图，验证账号/风控/写盘链路。
@@ -651,21 +663,27 @@ func (a *App) TestImage(prompt, ratio, model, style, account string) (TestResult
 	client.Debug = func(format string, args ...any) { a.logf(format, args...) }
 	a.logf("测试生图：使用账号 %s", acc.Display())
 
-	res, err := client.Generate(ctx, doubao.Request{
-		Prompt:   prompt,
-		Ratio:    firstNonEmpty(ratio, cfg.DefaultRatio),
-		Model:    firstNonEmpty(model, cfg.DefaultModel),
-		Style:    style,
-		OutDir:   cfg.OutDir,
-		FitRatio: cfg.FitRatio,
-		Timeout:  3 * time.Minute,
-	})
+	res, err := a.svc.GenerateWithChat(ctx, acc, client, doubao.Request{
+		Prompt:      prompt,
+		Ratio:       firstNonEmpty(ratio, cfg.DefaultRatio),
+		Model:       firstNonEmpty(model, cfg.DefaultModel),
+		Style:       style,
+		OutDir:      cfg.OutDir,
+		FitRatio:    cfg.FitRatio,
+		Timeout:     3 * time.Minute,
+		ContextMode: cfg.ContextMode,
+	}, cfg.ReuseChat())
 	if err != nil {
 		a.logf("测试失败: %v", err)
 		return TestResult{Message: doubao.FormatError(err)}, err
 	}
 
-	out := TestResult{OK: true, Message: fmt.Sprintf("拿到 %d 张图", len(res.Images))}
+	out := TestResult{
+		OK:      true,
+		Message: fmt.Sprintf("拿到 %d 张图", len(res.Images)),
+		ChatID:  res.ConversationID,
+		ChatURL: doubao.ChatURL(res.ConversationID),
+	}
 	for _, img := range res.Images {
 		out.Images = append(out.Images, mcpserver.ImageItem{
 			Path:   img.LocalPath,

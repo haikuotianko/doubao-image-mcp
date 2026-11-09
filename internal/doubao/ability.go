@@ -5,20 +5,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 )
 
 // buildAbilityPayload 构造 /chat/completion 的 body（抓包真值，逐字段对齐前端）。
-func buildAbilityPayload(prompt string, abilityType int, inner map[string]any, replyFormat string) map[string]any {
+//
+// conversationID 非空表示「在这个已有对话里继续」：此时不再新建对话，
+// 并把上一段的 section_id 带回去，服务端就会把新消息追加到同一个对话里。
+func buildAbilityPayload(prompt string, abilityType int, inner map[string]any, replyFormat, conversationID, sectionID string) map[string]any {
 	nowMS := time.Now().UnixMilli()
 	innerJSON, _ := json.Marshal(inner)
+	reuse := strings.TrimSpace(conversationID) != ""
 	return map[string]any{
 		"client_meta": map[string]any{
 			"local_conversation_id": fmt.Sprintf("local_%d", nowMS),
-			"conversation_id":       "",
+			"conversation_id":       conversationID,
 			"bot_id":                defaultBotID,
-			"last_section_id":       "",
+			"last_section_id":       sectionID,
 			"last_message_index":    nil,
 			"local_permissions": []any{
 				map[string]any{"permission_name": "ACCESS_COARSE_LOCATION", "status": 3},
@@ -72,8 +77,8 @@ func buildAbilityPayload(prompt string, abilityType int, inner map[string]any, r
 			"scene_type":                0,
 			"unique_key":                uuid4(),
 			"start_seq":                 0,
-			"need_create_conversation":  true,
-			"conversation_init_option":  map[string]any{"need_ack_conversation": true},
+			"need_create_conversation":  !reuse,
+			"conversation_init_option":  map[string]any{"need_ack_conversation": !reuse},
 			"regen_query_id":            []any{},
 			"edit_query_id":             []any{},
 			"regen_instruction":         "",
@@ -119,7 +124,7 @@ func buildAbilityPayload(prompt string, abilityType int, inner map[string]any, r
 			"general_task_param":            `{"server_do_compare":true}`,
 			"collection_id":                 "",
 			"is_finish":                     "1",
-			"conversation_init_option":      `{"need_ack_conversation":true}`,
+			"conversation_init_option":      fmt.Sprintf(`{"need_ack_conversation":%t}`, !reuse),
 			"commerce_credit_config_enable": "0",
 		},
 	}
@@ -143,9 +148,9 @@ func (c *Client) generateTextToImage(ctx context.Context, req Request, timeout t
 		ratio = "auto"
 	}
 
-	abilityText := req.Prompt
+	abilityText := withContextRule(req.Prompt, req.ContextMode)
 	if req.Style != "" {
-		abilityText = req.Prompt + "。图片风格为" + StyleName(req.Style)
+		abilityText = abilityText + "。图片风格为" + StyleName(req.Style)
 	}
 
 	inner := map[string]any{
@@ -160,7 +165,7 @@ func (c *Client) generateTextToImage(ctx context.Context, req Request, timeout t
 		"ability_type": 1,
 	}
 
-	payload := buildAbilityPayload(req.Prompt, 3, inner, replyImageText)
+	payload := buildAbilityPayload(req.Prompt, 3, inner, replyImageText, req.ConversationID, req.SectionID)
 	raw, err := c.postBody(ctx, buildURL("/chat/completion", newEndpointParams()), payload, timeout)
 	if err != nil {
 		return nil, err
@@ -238,6 +243,7 @@ func parseImageAbilitySSE(raw string, req Request) (*Result, error) {
 
 	// 全文兜底：按图合并无水印直链，并补回结构化解析漏掉的图（多图时一张都不能少）。
 	res.Images = dedupeImages(mergeWatermarkFree(res.Images, raw))
+	extractConversation(raw, res)
 	if len(noticeHits) > 0 && len(res.Images) == 0 {
 		res.Notice = "当前账号无该模型的创作额度（服务端返回订阅提示：" +
 			strings.Join(dedupeStrings(noticeHits), "、") + "），未出图。"
@@ -279,4 +285,25 @@ func dedupeStrings(in []string) []string {
 		out = append(out, s)
 	}
 	return out
+}
+
+// 从 SSE 原文里提取会话 id / section id。
+// 响应里 ack_client_meta 会带上真正的 conversation_id（新建对话时就是新分配的那个），
+// 后面各帧的 message.conversation_id 与它一致，取第一处即可。
+var (
+	conversationIDRe = regexp.MustCompile(`"conversation_id"\s*:\s*"(\d+)"`)
+	sectionIDRe      = regexp.MustCompile(`"section_id"\s*:\s*"(\d+)"`)
+)
+
+func extractConversation(raw string, res *Result) {
+	if res.ConversationID == "" {
+		if m := conversationIDRe.FindStringSubmatch(raw); m != nil {
+			res.ConversationID = m[1]
+		}
+	}
+	if res.SectionID == "" {
+		if m := sectionIDRe.FindStringSubmatch(raw); m != nil {
+			res.SectionID = m[1]
+		}
+	}
 }

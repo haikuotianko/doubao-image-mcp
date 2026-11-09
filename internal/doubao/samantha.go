@@ -92,9 +92,9 @@ func (c *Client) generateImageToImage(ctx context.Context, req Request, timeout 
 
 // samanthaGenerate 发一次旧通道生图请求并解析结果。
 func (c *Client) samanthaGenerate(ctx context.Context, req Request, keys []string, timeout time.Duration) (*Result, error) {
-	text := req.Prompt
+	text := withContextRule(req.Prompt, req.ContextMode)
 	if req.Style != "" {
-		text = req.Prompt + "。图片风格为" + StyleName(req.Style)
+		text = text + "。图片风格为" + StyleName(req.Style)
 	}
 	msg := samanthaMessage(text, req.Ratio, keys)
 	payload := buildSamanthaPayload(msg)

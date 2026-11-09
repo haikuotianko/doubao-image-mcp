@@ -93,6 +93,8 @@ export namespace main {
 	    fitRatio: boolean;
 	    httpAddr: string;
 	    autoStartHttp: boolean;
+	    reuseChat: boolean;
+	    contextMode: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -107,6 +109,8 @@ export namespace main {
 	        this.fitRatio = source["fitRatio"];
 	        this.httpAddr = source["httpAddr"];
 	        this.autoStartHttp = source["autoStartHttp"];
+	        this.reuseChat = source["reuseChat"];
+	        this.contextMode = source["contextMode"];
 	    }
 	}
 	export class Status {
@@ -121,6 +125,8 @@ export namespace main {
 	    defaultStyle: string;
 	    fitRatio: boolean;
 	    autoStartHttp: boolean;
+	    reuseChat: boolean;
+	    contextMode: string;
 	    configPath: string;
 	    exePath: string;
 	    appVersion: string;
@@ -148,6 +154,8 @@ export namespace main {
 	        this.defaultStyle = source["defaultStyle"];
 	        this.fitRatio = source["fitRatio"];
 	        this.autoStartHttp = source["autoStartHttp"];
+	        this.reuseChat = source["reuseChat"];
+	        this.contextMode = source["contextMode"];
 	        this.configPath = source["configPath"];
 	        this.exePath = source["exePath"];
 	        this.appVersion = source["appVersion"];
@@ -181,6 +189,8 @@ export namespace main {
 	    ok: boolean;
 	    message: string;
 	    images: mcpserver.ImageItem[];
+	    chatId?: string;
+	    chatUrl?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new TestResult(source);
@@ -191,6 +201,8 @@ export namespace main {
 	        this.ok = source["ok"];
 	        this.message = source["message"];
 	        this.images = this.convertValues(source["images"], mcpserver.ImageItem);
+	        this.chatId = source["chatId"];
+	        this.chatUrl = source["chatUrl"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

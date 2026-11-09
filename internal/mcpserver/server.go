@@ -56,6 +56,9 @@ type ImageInput struct {
 	FitRatio       *bool    `json:"fit_ratio,omitempty" jsonschema:"是否把结果裁剪/补边到请求比例，默认跟随配置"`
 	TimeoutSeconds int      `json:"timeout_seconds,omitempty" jsonschema:"超时秒数，默认 180"`
 	Inline         bool     `json:"inline,omitempty" jsonschema:"是否把图片本体以 base64 内联返回（体积大，默认 false 只给路径/链接）"`
+	NewChat        bool     `json:"new_chat,omitempty" jsonschema:"是否强制新建对话；默认沿用上一次的对话继续生成"`
+	ChatID         string   `json:"chat_id,omitempty" jsonschema:"要继续的会话 id 或对话链接（https://www.doubao.com/chat/<id>）；留空则沿用上次的对话"`
+	ContextMode    string   `json:"context_mode,omitempty" jsonschema:"上下文隔离：none 不隔离 / always 每次隔离 / auto 自动判断；留空跟随配置"`
 }
 
 // ImageItem 是单张结果图。
@@ -75,6 +78,9 @@ type ImageOutput struct {
 	Channel string      `json:"channel"`
 	Notice  string      `json:"notice,omitempty"`
 	Images  []ImageItem `json:"images"`
+	// ChatID / ChatURL 是这次生成落在的对话，方便在网页里打开看。
+	ChatID  string `json:"chat_id,omitempty"`
+	ChatURL string `json:"chat_url,omitempty"`
 }
 
 // ModelsOutput 是 doubao_models 的返回值。
@@ -200,10 +206,10 @@ func (s *Service) handleLogin(ctx context.Context, req *mcp.CallToolRequest, in 
 
 	s.logf("MCP 收到登录请求，打开扫码窗口")
 	win, err := loginwin.Open(loginwin.Options{
-		Logf:            s.logf,
-		PollInterval:    1500 * time.Millisecond,
-		ClearCookies:    true,
-		SkipSessions:    skip,
+		Logf:         s.logf,
+		PollInterval: 1500 * time.Millisecond,
+		ClearCookies: true,
+		SkipSessions: skip,
 	})
 	if err != nil {
 		return reply(LoginOutput{Message: "打不开登录窗口：" + err.Error()})
@@ -302,6 +308,62 @@ func (s *Service) clientForAccount(account config.Account) *doubao.Client {
 // Pool 暴露账号调度器，GUI 的「测试生图」也走同一套排队。
 func (s *Service) Pool() *accountpool.Pool { return s.pool }
 
+// GenerateWithChat 执行一次生图，并负责「复用同一个对话」。
+//
+// 规则（reuse 为 true 时）：
+//  1. 账号上记着上次的对话 → 带上 conversation_id 继续往那个对话里发；
+//  2. 成功 → 更新记录（服务端可能换 section）；
+//  3. 没有记录，或在旧对话里失败 → 新建对话重新发一次，成功则记下新对话。
+//
+// 登录失效 / 风控 / 额度这类错误跟对话无关，不重试，直接报给调用方。
+func (s *Service) GenerateWithChat(ctx context.Context, acc config.Account, client *doubao.Client, req doubao.Request, reuse bool) (*doubao.Result, error) {
+	save := func(res *doubao.Result) {
+		if res == nil {
+			return
+		}
+		if strings.TrimSpace(res.ConversationID) != "" {
+			_ = s.store.SetChat(acc.Name, res.ConversationID, res.SectionID)
+			return
+		}
+		// 走旧通道兜底时服务端不返回对话 id，这次其实已经另起了一个对话；
+		// 留着旧 id 会让下次继续往一个可能已经不对的对话里发，所以清掉。
+		_ = s.store.ClearChat(acc.Name)
+	}
+
+	if !reuse {
+		res, err := client.Generate(ctx, req)
+		if err != nil {
+			return res, err
+		}
+		_ = s.store.ClearChat(acc.Name) // 每次都新建，就别留着旧记录了
+		save(res)
+		return res, nil
+	}
+
+	if strings.TrimSpace(acc.ChatID) != "" {
+		req.ConversationID = acc.ChatID
+		req.SectionID = acc.ChatSection
+		res, err := client.Generate(ctx, req)
+		if err == nil {
+			save(res)
+			return res, nil
+		}
+		if doubao.IsKind(err, doubao.KindLogin) || doubao.IsKind(err, doubao.KindRisk) || doubao.IsKind(err, doubao.KindQuota) {
+			return nil, err
+		}
+		s.logf("在已有对话 %s 里生成失败（%v），改用新对话重试", acc.ChatID, err)
+		_ = s.store.ClearChat(acc.Name)
+		req.ConversationID, req.SectionID = "", ""
+	}
+
+	res, err := client.Generate(ctx, req)
+	if err != nil {
+		return res, err
+	}
+	save(res)
+	return res, nil
+}
+
 func (s *Service) handleImage(ctx context.Context, req *mcp.CallToolRequest, in ImageInput) (*mcp.CallToolResult, ImageOutput, error) {
 	if strings.TrimSpace(in.Prompt) == "" {
 		return nil, ImageOutput{}, fmt.Errorf("prompt 不能为空")
@@ -329,16 +391,25 @@ func (s *Service) handleImage(ctx context.Context, req *mcp.CallToolRequest, in 
 	}
 
 	s.logf("生成图片：账号=%s 模型=%s 比例=%s 风格=%q（排队中 %d）", account.Display(), model, ratio, in.Style, s.pool.Waiting())
-	result, err := client.Generate(ctx, doubao.Request{
-		Prompt:    in.Prompt,
-		Ratio:     ratio,
-		Model:     model,
-		Style:     in.Style,
-		RefImages: in.RefImages,
-		OutDir:    outDir,
-		FitRatio:  fit,
-		Timeout:   timeout,
-	})
+	reuse := cfg.ReuseChat() && !in.NewChat
+	// 显式给了会话 id 或对话链接：就在那个对话里继续，优先级高于本地记录。
+	if id := doubao.ParseChatID(in.ChatID); id != "" {
+		account.ChatID = id
+		account.ChatSection = ""
+		reuse = true
+	}
+	contextMode := firstNonEmpty(in.ContextMode, cfg.ContextMode)
+	result, err := s.GenerateWithChat(ctx, account, client, doubao.Request{
+		Prompt:      in.Prompt,
+		Ratio:       ratio,
+		Model:       model,
+		Style:       in.Style,
+		RefImages:   in.RefImages,
+		OutDir:      outDir,
+		FitRatio:    fit,
+		Timeout:     timeout,
+		ContextMode: contextMode,
+	}, reuse)
 	if err != nil {
 		s.logf("生成失败: %v", err)
 		return nil, ImageOutput{}, fmt.Errorf("%s", doubao.FormatError(err))
@@ -350,6 +421,8 @@ func (s *Service) handleImage(ctx context.Context, req *mcp.CallToolRequest, in 
 		Ratio:   result.Ratio,
 		Channel: result.Channel,
 		Notice:  result.Notice,
+		ChatID:  result.ConversationID,
+		ChatURL: doubao.ChatURL(result.ConversationID),
 	}
 	s.logf("生成完成：拿到 %d 张图（通道 %s）", len(result.Images), result.Channel)
 	var contents []mcp.Content

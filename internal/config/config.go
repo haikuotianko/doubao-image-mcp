@@ -33,6 +33,11 @@ type Account struct {
 	// Disabled 为 true 时该账号不参与自动排队。
 	// 用「反向」字段是为了兼容老配置：老配置没有这个字段，零值 false 正好表示启用。
 	Disabled bool `json:"disabled,omitempty"`
+
+	// ChatID / ChatSection 是「复用同一个对话」用的会话标识（服务端生成，下次继续往里发）。
+	// 换了账号自然是另一个对话，所以按账号存。
+	ChatID      string `json:"chatId,omitempty"`
+	ChatSection string `json:"chatSection,omitempty"`
 }
 
 // Display 返回展示用名字：优先昵称，其次内部标识。
@@ -78,7 +83,17 @@ type Config struct {
 	HTTPAddr      string `json:"httpAddr"`
 	AutoStartHTTP bool   `json:"autoStartHttp"`
 	Debug         bool   `json:"debug"`
+
+	// NoReuseChat 为 true 时每次生图都新建对话。
+	// 默认是「复用同一个对话」，用反向字段才能让老配置（没有该字段）也默认开启。
+	NoReuseChat bool `json:"noReuseChat,omitempty"`
+
+	// ContextMode 是复用对话时的上下文隔离策略：none / always / auto。
+	ContextMode string `json:"contextMode,omitempty"`
 }
+
+// ReuseChat 表示是否复用同一个对话生图（默认开启）。
+func (c Config) ReuseChat() bool { return !c.NoReuseChat }
 
 // Default 返回带默认值的配置。
 func Default() Config {
@@ -89,6 +104,7 @@ func Default() Config {
 		DefaultModel:  "Seedream 5.0 Flash",
 		HTTPAddr:      "127.0.0.1:8770",
 		AutoStartHTTP: false,
+		ContextMode:   "auto",
 	}
 }
 
@@ -149,6 +165,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.DefaultModel == "" {
 		c.DefaultModel = d.DefaultModel
+	}
+	if c.ContextMode == "" {
+		c.ContextMode = d.ContextMode
 	}
 }
 
@@ -328,6 +347,35 @@ func (s *Store) UpdateProfile(name, nickname, avatar string) error {
 				if avatar != "" {
 					c.Accounts[i].Avatar = avatar
 				}
+				return
+			}
+		}
+	})
+}
+
+// SetChat 记住这个账号当前使用的对话，下次生图继续往里发。
+func (s *Store) SetChat(name, conversationID, sectionID string) error {
+	if strings.TrimSpace(conversationID) == "" {
+		return nil
+	}
+	return s.Update(func(c *Config) {
+		for i := range c.Accounts {
+			if c.Accounts[i].Name == name {
+				c.Accounts[i].ChatID = conversationID
+				c.Accounts[i].ChatSection = sectionID
+				return
+			}
+		}
+	})
+}
+
+// ClearChat 忘掉账号的对话记录（下次生图会新建对话）。
+func (s *Store) ClearChat(name string) error {
+	return s.Update(func(c *Config) {
+		for i := range c.Accounts {
+			if c.Accounts[i].Name == name {
+				c.Accounts[i].ChatID = ""
+				c.Accounts[i].ChatSection = ""
 				return
 			}
 		}
