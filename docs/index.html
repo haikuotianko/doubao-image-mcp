@@ -403,7 +403,7 @@ cd doubao-image-mcp &amp;&amp; chmod +x doubao-image-mcp
 
 <footer>
   <div class="wrap row">
-    <span>© <span id="year">2026</span> haikuotianko · MIT License</span>
+    <span>© <span id="year">2026</span> haikuotianko · MIT License · <span id="siteViews"></span></span>
     <span>
       <a href="https://github.com/haikuotianko/doubao-image-mcp">源代码</a> ·
       <a href="https://github.com/haikuotianko/doubao-image-mcp/releases">版本发布</a> ·
@@ -453,7 +453,8 @@ cd doubao-image-mcp &amp;&amp; chmod +x doubao-image-mcp
     });
   });
 
-  // 下载列表：读取最新 Release 的资产，按平台排序渲染
+  // 下载列表：优先读仓库里的静态 latest.json（同源、不限流、加载快）；
+  // 读不到再退回 GitHub API，两条都失败才显示「前往 Releases」。
   var REPO = 'haikuotianko/doubao-image-mcp';
   var PLATFORMS = [
     { key: 'windows-x64',   match: /windows-x64\.zip$/,   os: 'Windows x64',          tag: '推荐',   note: 'GUI 完整版 · 含扫码登录' },
@@ -488,15 +489,44 @@ cd doubao-image-mcp &amp;&amp; chmod +x doubao-image-mcp
     }
   }
 
-  fetch('https://api.github.com/repos/' + REPO + '/releases/latest')
+  // 静态 latest.json → GitHub API → 兜底卡片
+  function loadLatestJson() {
+    return fetch('latest.json', { cache: 'no-cache' })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function (d) {
+        if (!d || !d.assets || !d.assets.length) return Promise.reject('latest.json 为空');
+        return {
+          tag_name: d.tag,
+          assets: d.assets.map(function (a) {
+            return { name: a.name, size: a.size, browser_download_url: a.url };
+          }),
+        };
+      });
+  }
+
+  function loadFromAPI() {
+    return fetch('https://api.github.com/repos/' + REPO + '/releases/latest')
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); });
+  }
+
+  function showFallback() {
+    document.getElementById('dl-grid').innerHTML =
+      '<a class="dl" href="https://github.com/' + REPO + '/releases/latest" data-track="download/releases-page">' +
+      '<span class="os">前往 Releases 下载</span>' +
+      '<span class="meta">按平台选择安装包</span></a>';
+  }
+
+  loadLatestJson().catch(loadFromAPI).then(render).catch(showFallback);
+
+  // 页脚访问量：公开计数器；被拦截或失败就保持空白，不打扰读者。
+  fetch('https://lucky-hai.goatcounter.com/counter/TOTAL.json', { cache: 'no-store' })
     .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
-    .then(render)
-    .catch(function () {
-      document.getElementById('dl-grid').innerHTML =
-        '<a class="dl" href="https://github.com/' + REPO + '/releases/latest" data-track="download/releases-page">' +
-        '<span class="os">前往 Releases 下载</span>' +
-        '<span class="meta">按平台选择安装包</span></a>';
-    });
+    .then(function (d) {
+      if (d && d.count) {
+        document.getElementById('siteViews').textContent = '本站已访问 ' + d.count + ' 次';
+      }
+    })
+    .catch(function () {});
 </script>
 </body>
 </html>

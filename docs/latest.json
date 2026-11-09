@@ -1,0 +1,43 @@
+{
+    "tag":  "v1.2.0",
+    "name":  "v1.2.0 自动检查更新",
+    "published":  "2026-11-07T02:41:26Z",
+    "url":  "https://github.com/haikuotianko/doubao-image-mcp/releases/tag/v1.2.0",
+    "assets":  [
+                   {
+                       "name":  "doubao-image-mcp-v1.2.0-linux-arm64-cli.zip",
+                       "size":  3558087,
+                       "url":  "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.2.0/doubao-image-mcp-v1.2.0-linux-arm64-cli.zip"
+                   },
+                   {
+                       "name":  "doubao-image-mcp-v1.2.0-linux-x64-cli.zip",
+                       "size":  3957815,
+                       "url":  "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.2.0/doubao-image-mcp-v1.2.0-linux-x64-cli.zip"
+                   },
+                   {
+                       "name":  "doubao-image-mcp-v1.2.0-macos-arm64-cli.zip",
+                       "size":  3694428,
+                       "url":  "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.2.0/doubao-image-mcp-v1.2.0-macos-arm64-cli.zip"
+                   },
+                   {
+                       "name":  "doubao-image-mcp-v1.2.0-macos-x64-cli.zip",
+                       "size":  4020832,
+                       "url":  "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.2.0/doubao-image-mcp-v1.2.0-macos-x64-cli.zip"
+                   },
+                   {
+                       "name":  "doubao-image-mcp-v1.2.0-windows-arm64.zip",
+                       "size":  5323455,
+                       "url":  "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.2.0/doubao-image-mcp-v1.2.0-windows-arm64.zip"
+                   },
+                   {
+                       "name":  "doubao-image-mcp-v1.2.0-windows-x64.zip",
+                       "size":  5965101,
+                       "url":  "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.2.0/doubao-image-mcp-v1.2.0-windows-x64.zip"
+                   },
+                   {
+                       "name":  "doubao-image-mcp-v1.2.0-windows-x86.zip",
+                       "size":  5796022,
+                       "url":  "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.2.0/doubao-image-mcp-v1.2.0-windows-x86.zip"
+                   }
+               ]
+}
