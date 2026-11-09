@@ -9,6 +9,9 @@
 <meta property="og:description" content="用你自己的豆包网页登录态生图，接入任意 MCP 客户端，无需 API Key。">
 <meta property="og:image" content="screenshot.png">
 <link rel="icon" href="icon.png">
+<!-- 访问统计：GoatCounter，无 Cookie、不收集个人信息 -->
+<script data-goatcounter="https://lucky-hai.goatcounter.com/count"
+        async src="https://gc.zgo.at/count.js"></script>
 <style>
   :root {
     --blue: #0057ff;
@@ -207,7 +210,7 @@
       <a href="#download">下载</a>
       <a href="#start">快速开始</a>
       <a href="#faq">常见问题</a>
-      <a href="https://github.com/haikuotianko/doubao-image-mcp">GitHub ↗</a>
+      <a href="https://github.com/haikuotianko/doubao-image-mcp" data-track="outbound/github">GitHub ↗</a>
     </nav>
   </div>
 </header>
@@ -225,8 +228,8 @@
         <span class="badge">多账号自动排队</span>
       </div>
       <div class="cta">
-        <a class="btn btn-primary" href="#download">立即下载</a>
-        <a class="btn btn-ghost" href="https://github.com/haikuotianko/doubao-image-mcp">查看源码</a>
+        <a class="btn btn-primary" href="#download" data-track="cta/download">立即下载</a>
+        <a class="btn btn-ghost" href="https://github.com/haikuotianko/doubao-image-mcp" data-track="outbound/github">查看源码</a>
       </div>
     </div>
     <div class="shot"><img src="screenshot.png" alt="豆包生图 MCP 界面截图" loading="lazy"></div>
@@ -414,6 +417,19 @@ cd doubao-image-mcp &amp;&amp; chmod +x doubao-image-mcp
 <script>
   document.getElementById('year').textContent = new Date().getFullYear();
 
+  // 事件埋点（GoatCounter）：页面浏览由脚本自动统计，这里只记点击。
+  // 任何带 data-track="xxx" 的元素被点都会记成一次事件，例如 download/windows-x64。
+  function track(path) {
+    if (window.goatcounter && window.goatcounter.count) {
+      window.goatcounter.count({ path: path, event: true });
+    }
+  }
+
+  document.addEventListener('click', function (e) {
+    var target = e.target.closest ? e.target.closest('[data-track]') : null;
+    if (target) track(target.getAttribute('data-track'));
+  });
+
   // 代码块复制
   document.querySelectorAll('.copy').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -439,13 +455,13 @@ cd doubao-image-mcp &amp;&amp; chmod +x doubao-image-mcp
   // 下载列表：读取最新 Release 的资产，按平台排序渲染
   var REPO = 'haikuotianko/doubao-image-mcp';
   var PLATFORMS = [
-    { match: /windows-x64\.zip$/,   os: 'Windows x64',          tag: '推荐',   note: 'GUI 完整版 · 含扫码登录' },
-    { match: /windows-x86\.zip$/,   os: 'Windows x86（32 位）', tag: '',       note: 'GUI 完整版 · 老机器' },
-    { match: /windows-arm64\.zip$/, os: 'Windows ARM64',        tag: '',       note: 'GUI 完整版' },
-    { match: /macos-arm64-cli\.zip$/, os: 'macOS Apple 芯片',   tag: '',       note: '命令行版' },
-    { match: /macos-x64-cli\.zip$/,  os: 'macOS Intel',         tag: '',       note: '命令行版' },
-    { match: /linux-x64-cli\.zip$/,  os: 'Linux x64',           tag: '',       note: '命令行版' },
-    { match: /linux-arm64-cli\.zip$/, os: 'Linux ARM64',        tag: '',       note: '命令行版' }
+    { key: 'windows-x64',   match: /windows-x64\.zip$/,   os: 'Windows x64',          tag: '推荐',   note: 'GUI 完整版 · 含扫码登录' },
+    { key: 'windows-x86',   match: /windows-x86\.zip$/,   os: 'Windows x86（32 位）', tag: '',       note: 'GUI 完整版 · 老机器' },
+    { key: 'windows-arm64', match: /windows-arm64\.zip$/, os: 'Windows ARM64',        tag: '',       note: 'GUI 完整版' },
+    { key: 'macos-arm64',   match: /macos-arm64-cli\.zip$/, os: 'macOS Apple 芯片',   tag: '',       note: '命令行版' },
+    { key: 'macos-x64',     match: /macos-x64-cli\.zip$/,  os: 'macOS Intel',         tag: '',       note: '命令行版' },
+    { key: 'linux-x64',     match: /linux-x64-cli\.zip$/,  os: 'Linux x64',           tag: '',       note: '命令行版' },
+    { key: 'linux-arm64',   match: /linux-arm64-cli\.zip$/, os: 'Linux ARM64',        tag: '',       note: '命令行版' }
   ];
 
   function fmtSize(bytes) {
@@ -459,7 +475,7 @@ cd doubao-image-mcp &amp;&amp; chmod +x doubao-image-mcp
     PLATFORMS.forEach(function (p) {
       var a = assets.find(function (x) { return p.match.test(x.name); });
       if (!a) return;
-      html += '<a class="dl" href="' + a.browser_download_url + '">' +
+      html += '<a class="dl" href="' + a.browser_download_url + '" data-track="download/' + p.key + '">' +
         '<span class="os">' + p.os + (p.tag ? ' <span class="tag">' + p.tag + '</span>' : '') + '</span>' +
         '<span class="meta">' + p.note + ' · ' + fmtSize(a.size) + '</span>' +
         '</a>';
@@ -476,7 +492,7 @@ cd doubao-image-mcp &amp;&amp; chmod +x doubao-image-mcp
     .then(render)
     .catch(function () {
       document.getElementById('dl-grid').innerHTML =
-        '<a class="dl" href="https://github.com/' + REPO + '/releases/latest">' +
+        '<a class="dl" href="https://github.com/' + REPO + '/releases/latest" data-track="download/releases-page">' +
         '<span class="os">前往 Releases 下载</span>' +
         '<span class="meta">按平台选择安装包</span></a>';
     });
