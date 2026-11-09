@@ -44,6 +44,12 @@ type Error struct {
 	Code   string
 	Msg    string
 	Detail string
+	// NeedVerify 为真表示服务端要求先完成一次人机验证（滑块）才能继续。
+	NeedVerify bool
+	// VerifyURL 是服务端给验证页地址（有就打开它，没有就让用户在豆包页面里手动触发）。
+	VerifyURL string
+	// VerifyData 是原始的 decision JSON，排障时有用。
+	VerifyData string
 }
 
 func (e *Error) Error() string {
@@ -71,7 +77,13 @@ func (e *Error) Hint() string {
 	case KindLogin:
 		return "登录态已失效，请在「豆包生图 MCP」里重新扫码登录。"
 	case KindRisk:
-		return "豆包 IP 级风控限流：等 30 分钟冷却、换网络（手机热点最快），或在浏览器里手动完成一次滑块验证。"
+		if e.NeedVerify {
+			return "豆包要求先完成一次人机验证（滑块）：在程序里点「去验证」会打开豆包窗口，" +
+				"随便发一条消息触发滑块、拖过去完成后，回来重新生成即可。" +
+				"验证期间别开豆包网页版（会持续触发风控，越开越久）。"
+		}
+		return "豆包 IP 级风控限流：等 30 分钟冷却、换网络（手机热点最快），或在程序里点「去验证」手动过一次滑块。" +
+			"冷却期间别开豆包网页版——网页版会持续打同样的接口，相当于一直在续命风控状态，冷却时间会被拉长。"
 	case KindQuota:
 		return "当前账号没有该模型的创作额度：换免费的 Seedream 5.0 Flash / 4.5 / 4.0，或升级订阅。"
 	case KindNoImage:

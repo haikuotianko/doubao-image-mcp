@@ -218,7 +218,8 @@ func parseImageAbilitySSE(raw string, req Request) (*Result, error) {
 			if msg == "" {
 				msg = asString(d["msg"])
 			}
-			return nil, newErr(classifyCode(code), "生成图片", code, "服务端返回错误", msg+" "+ev.Data)
+			kind := classifyCode(code)
+			return nil, attachVerify(newErr(kind, "生成图片", code, "服务端返回错误", msg+" "+ev.Data), d)
 		}
 		// 会话线索可能在任意事件里（ack_client_meta 那帧的事件名不在生图白名单里），
 		// 所以先提取，再按事件类型筛图片内容。

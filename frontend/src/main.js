@@ -8,6 +8,7 @@ import {
     LoginDialog,
     OpenOutDir,
     OpenURL,
+    OpenVerifyWindow,
     RemoveAccount,
     ReorderAccounts,
     SaveImageAs,
@@ -94,6 +95,11 @@ document.querySelector('#app').innerHTML = `
           <option value="always">每次隔离：明确要求忽略上文</option>
           <option value="none">不隔离：完全沿用上文</option>
         </select>
+        <label>风控验证</label>
+        <div class="row">
+          <button class="sm" id="btnVerify">去验证（滑块）</button>
+          <span class="hint" style="margin:0;flex:1">生图报 710022004 时点这里，在打开的窗口里拖过滑块</span>
+        </div>
         <label>HTTP 地址</label>
         <input type="text" id="httpAddr" placeholder="127.0.0.1:8770" />
         <label>自动启动</label>
@@ -691,6 +697,21 @@ el('btnTest').onclick = async () => {
 };
 
 el('btnCheckUpdate').onclick = manualCheckUpdate;
+
+el('btnVerify').onclick = async () => {
+  const btn = el('btnVerify');
+  btn.disabled = true;
+  btn.textContent = '窗口已打开…';
+  try {
+    const msg = await OpenVerifyWindow('');
+    if (msg) appendLog(msg);
+  } catch (err) {
+    appendLog('打开验证窗口失败：' + (err && err.message ? err.message : err));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '去验证（滑块）';
+  }
+};
 
 EventsOn('log', (line) => appendLog(line));
 

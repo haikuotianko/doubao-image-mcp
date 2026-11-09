@@ -42,6 +42,10 @@ export function OpenURL(arg1) {
   return window['go']['main']['App']['OpenURL'](arg1);
 }
 
+export function OpenVerifyWindow(arg1) {
+  return window['go']['main']['App']['OpenVerifyWindow'](arg1);
+}
+
 export function RefreshProfile(arg1) {
   return window['go']['main']['App']['RefreshProfile'](arg1);
 }

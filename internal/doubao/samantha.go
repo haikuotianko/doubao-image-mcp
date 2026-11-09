@@ -106,6 +106,15 @@ func (c *Client) samanthaGenerate(ctx context.Context, req Request, keys []strin
 
 	res := &Result{Prompt: req.Prompt, Model: req.Model, Ratio: req.Ratio, Channel: "samantha"}
 	parseSamanthaSSE(string(raw), res)
+	// 旧通道不返回 error_code，风控只在原文里出现，这里补一次识别。
+	if len(res.Images) == 0 {
+		text := string(raw)
+		for _, code := range []string{"710022004", "710022002"} {
+			if strings.Contains(text, code) {
+				return nil, newErr(KindRisk, "生成图片", code, "服务端风控拦截", truncate(text, 300))
+			}
+		}
+	}
 	if len(res.Images) == 0 {
 		if res.Notice != "" {
 			return nil, noticeErr("生成图片", res.Notice)

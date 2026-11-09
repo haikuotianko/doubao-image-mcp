@@ -22,6 +22,8 @@ export function OpenOutDir():Promise<void>;
 
 export function OpenURL(arg1:string):Promise<void>;
 
+export function OpenVerifyWindow(arg1:string):Promise<string>;
+
 export function RefreshProfile(arg1:string):Promise<void>;
 
 export function RemoveAccount(arg1:string):Promise<void>;

@@ -145,6 +145,11 @@ func (s *Service) NewServer() *mcp.Server {
 	}, s.handleLogin)
 
 	mcp.AddTool(server, &mcp.Tool{
+		Name:        "doubao_verify",
+		Description: "打开豆包窗口让你手动完成人机验证（滑块）。生图被风控（710022004 / 710022002）时调用它，拖完滑块再重试 doubao_image。",
+	}, s.handleVerify)
+
+	mcp.AddTool(server, &mcp.Tool{
 		Name:        "doubao_image",
 		Description: "用豆包网页版生成图片（文生图；给了 ref_images 就是图生图）。返回本地路径与图片链接。没登录时先调 doubao_login。",
 	}, s.handleImage)
@@ -173,6 +178,47 @@ func (s *Service) NewServer() *mcp.Server {
 	}, s.handleAccounts)
 
 	return server
+}
+
+// handleVerify 打开窗口让用户过一次人机验证（滑块）。
+// 验证状态记在浏览器/网关侧，我们只需要把窗口开出来、等用户滑完关掉。
+func (s *Service) handleVerify(ctx context.Context, req *mcp.CallToolRequest, in struct{}) (*mcp.CallToolResult, LoginOutput, error) {
+	reply := func(msg string) (*mcp.CallToolResult, LoginOutput, error) {
+		out := LoginOutput{Message: msg}
+		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: msg}}}, out, nil
+	}
+
+	if !loginwin.Supported() {
+		return reply("当前平台没有内置浏览器窗口：请在系统浏览器里打开 doubao.com 完成验证后重试")
+	}
+
+	acc, ok := s.store.ActiveAccount()
+	if !ok {
+		return reply("还没有登录任何账号，先调用 doubao_login")
+	}
+
+	s.logf("MCP 收到人机验证请求，打开窗口（账号 %s）", acc.Display())
+	win, err := loginwin.Open(loginwin.Options{
+		Title:    "人机验证 · " + acc.Display(),
+		Width:    920,
+		Height:   780,
+		Logf:     s.logf,
+		ViewOnly: true,
+		Cookies:  acc.Cookies,
+		URL:      loginwin.DefaultURL,
+	})
+	if err != nil {
+		return reply("打不开验证窗口：" + err.Error())
+	}
+	defer win.Close()
+
+	// 最多等 5 分钟，用户随时可以关窗口。
+	waitCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	if _, err := win.WaitLogin(waitCtx); err != nil && !errors.Is(err, loginwin.ErrClosed) {
+		return reply("验证窗口结束了（" + err.Error() + "），如果已经滑过滑块，直接重试 doubao_image")
+	}
+	return reply("验证窗口已关闭；如果刚在页面里拖过滑块，现在重新调用 doubao_image 即可。")
 }
 
 // handleLogin 直接从 MCP 进程弹窗扫码。

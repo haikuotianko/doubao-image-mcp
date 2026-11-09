@@ -281,6 +281,7 @@
           <tr><td><code>doubao_models</code></td><td>列出可用模型、32 种风格 key、8 种比例</td></tr>
           <tr><td><code>doubao_ping</code></td><td>检查登录态是否有效，也能识别 IP 风控</td></tr>
           <tr><td><code>doubao_accounts</code></td><td>账号池：列出 / 切换默认 / 启用 / 停用 / 删除</td></tr>
+          <tr><td><code>doubao_verify</code></td><td>被风控时打开豆包窗口，手动拖一次滑块验证</td></tr>
         </tbody>
       </table>
     </div>
@@ -380,7 +381,7 @@ cd doubao-image-mcp &amp;&amp; chmod +x doubao-image-mcp
     </details>
     <details>
       <summary>会被封号吗？</summary>
-      <p>属于逆向调用网页接口，没有官方保证。程序做了并发限制（每个账号同时只跑一个任务）与自动排队来降低风控概率；请自己控制频率，不要批量刷额度。</p>
+      <p>属于逆向调用网页接口，没有官方保证。程序做了并发限制（每个账号同时只跑一个任务）与自动排队来降低风控概率；请自己控制频率，不要批量刷额度。</p><p>遇到 <code>710022004</code>（人机验证）时，点界面里的「去验证」会弹出豆包窗口，拖过滑块再重试即可；风控冷却期间别开豆包网页版，否则会一直续期风控状态。</p>
     </details>
     <details>
       <summary>为什么 macOS / Linux 没有图形界面？</summary>

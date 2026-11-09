@@ -634,6 +634,63 @@ func (a *App) StopHTTP() error {
 	return server.Shutdown(ctx)
 }
 
+// OpenVerifyWindow 打开一个豆包窗口，让用户手动完成人机验证（滑块）。
+// url 为空时打开豆包对话页；服务端若给了验证地址，可以把它传进来。
+// 用户滑完把窗口关掉即可，程序不需要知道验证结果。
+func (a *App) OpenVerifyWindow(url string) (string, error) {
+	if !loginwin.Supported() {
+		return "", errors.New("当前平台没有内置浏览器：请在系统浏览器里打开 doubao.com 完成验证")
+	}
+	account, ok := a.store.ActiveAccount()
+	if !ok || account.Name == "" {
+		return "", errors.New("还没有登录任何账号，先点「扫码登录」")
+	}
+	if strings.TrimSpace(url) == "" {
+		url = loginwin.DefaultURL
+	}
+
+	a.loginMu.Lock()
+	if a.login != nil {
+		a.loginMu.Unlock()
+		return "", errors.New("已经有一个浏览器窗口开着，先关掉它")
+	}
+	a.loginMu.Unlock()
+
+	a.logf("打开人机验证窗口：账号 %s，地址 %s", account.Display(), url)
+	win, err := loginwin.Open(loginwin.Options{
+		Title:    "人机验证 · " + account.Display(),
+		Width:    920,
+		Height:   780,
+		Logf:     a.logf,
+		ViewOnly: true,
+		Cookies:  account.Cookies,
+		URL:      url,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	a.loginMu.Lock()
+	a.login = win
+	a.loginMu.Unlock()
+	defer func() {
+		a.loginMu.Lock()
+		if a.login == win {
+			a.login = nil
+		}
+		a.loginMu.Unlock()
+	}()
+
+	// 窗口一直开着，用户关掉就算完成。
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+	_, err = win.WaitLogin(ctx)
+	if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+		a.logf("人机验证窗口结束：%v", err)
+	}
+	return "验证窗口已关闭；如果刚在页面里拖过滑块，回来重新生成即可。", nil
+}
+
 // ---------------------------------------------------------------- 测试生图
 
 // TestResult 是 GUI 里测一次生图的结果。
