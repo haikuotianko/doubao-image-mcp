@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -14,7 +15,7 @@ import (
 //
 // conversationID 非空表示「在这个已有对话里继续」：此时不再新建对话，
 // 并把上一段的 section_id 带回去，服务端就会把新消息追加到同一个对话里。
-func buildAbilityPayload(prompt string, abilityType int, inner map[string]any, replyFormat, conversationID, sectionID string) map[string]any {
+func buildAbilityPayload(prompt string, abilityType int, inner map[string]any, replyFormat, conversationID, sectionID string, lastMessageIndex int) map[string]any {
 	nowMS := time.Now().UnixMilli()
 	innerJSON, _ := json.Marshal(inner)
 	reuse := strings.TrimSpace(conversationID) != ""
@@ -24,7 +25,7 @@ func buildAbilityPayload(prompt string, abilityType int, inner map[string]any, r
 			"conversation_id":       conversationID,
 			"bot_id":                defaultBotID,
 			"last_section_id":       sectionID,
-			"last_message_index":    nil,
+			"last_message_index":    lastIndexValue(lastMessageIndex),
 			"local_permissions": []any{
 				map[string]any{"permission_name": "ACCESS_COARSE_LOCATION", "status": 3},
 				map[string]any{"permission_name": "ACCESS_FINE_LOCATION", "status": 3},
@@ -165,7 +166,7 @@ func (c *Client) generateTextToImage(ctx context.Context, req Request, timeout t
 		"ability_type": 1,
 	}
 
-	payload := buildAbilityPayload(req.Prompt, 3, inner, replyImageText, req.ConversationID, req.SectionID)
+	payload := buildAbilityPayload(req.Prompt, 3, inner, replyImageText, req.ConversationID, req.SectionID, req.LastMessageIndex)
 	raw, err := c.postBody(ctx, buildURL("/chat/completion", newEndpointParams()), payload, timeout)
 	if err != nil {
 		return nil, err
@@ -306,6 +307,7 @@ var (
 type convIDs struct {
 	ackConv, ackSection string
 	msgConv, msgSection string
+	lastIndex           int
 }
 
 // pickConversation 从单帧 JSON 里取会话 id（只记录，不直接写进结果）。
@@ -331,6 +333,11 @@ func (c *convIDs) pick(d map[string]any) {
 			c.msgSection = asString(meta["section_id"])
 		}
 	}
+	for _, key := range []string{"index_in_conv", "message_index"} {
+		if n := findMaxIntByKey(d, key, 6); n > c.lastIndex {
+			c.lastIndex = n
+		}
+	}
 }
 
 // apply 把收集到的 id 按优先级写进结果。
@@ -347,11 +354,22 @@ func (c *convIDs) apply(res *Result) {
 	case c.msgSection != "":
 		res.SectionID = c.msgSection
 	}
+	if c.lastIndex > 0 {
+		res.LastMessageIndex = c.lastIndex
+	}
 }
 
 // findMapByKey 在嵌套 JSON 里按 key 找第一个对象（深度有限，避免遍历过大）。
 func findMapByKey(v any, key string, depth int) map[string]any {
 	if depth <= 0 {
+		return nil
+	}
+	if list := asSlice(v); list != nil {
+		for _, child := range list {
+			if sub := findMapByKey(child, key, depth-1); sub != nil {
+				return sub
+			}
+		}
 		return nil
 	}
 	m := asMap(v)
@@ -380,4 +398,61 @@ func extractConversation(raw string, res *Result) {
 			res.SectionID = m[1]
 		}
 	}
+}
+
+// lastIndexValue 让 last_message_index 在没有历史时是 null（和网页版一致）。
+func lastIndexValue(n int) any {
+	if n <= 0 {
+		return nil
+	}
+	return n
+}
+
+// findMaxIntByKey 在嵌套 JSON 里找 key 的最大整数值（消息序号可能出现在多帧里）。
+func findMaxIntByKey(v any, key string, depth int) int {
+	if depth <= 0 {
+		return 0
+	}
+	if list := asSlice(v); list != nil {
+		max := 0
+		for _, child := range list {
+			if n := findMaxIntByKey(child, key, depth-1); n > max {
+				max = n
+			}
+		}
+		return max
+	}
+	m := asMap(v)
+	if m == nil {
+		return 0
+	}
+	max := 0
+	if raw, ok := m[key]; ok {
+		if n := toInt(raw); n > max {
+			max = n
+		}
+	}
+	for _, child := range m {
+		if n := findMaxIntByKey(child, key, depth-1); n > max {
+			max = n
+		}
+	}
+	return max
+}
+
+// toInt 尽力把 JSON 数字/字符串转成 int。
+func toInt(v any) int {
+	switch n := v.(type) {
+	case float64:
+		return int(n)
+	case int:
+		return n
+	case json.Number:
+		i, _ := n.Int64()
+		return int(i)
+	case string:
+		i, _ := strconv.Atoi(n)
+		return i
+	}
+	return 0
 }

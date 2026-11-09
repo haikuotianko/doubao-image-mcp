@@ -44,6 +44,8 @@ type Result struct {
 	Channel string `json:"channel"`
 	// ConversationID / SectionID 是这次请求落到的对话，供下次在同一对话里继续。
 	ConversationID string `json:"conversationId,omitempty"`
+	// LastMessageIndex 是对话里最后一条消息的序号（继续对话时带回，网页版也这么做）。
+	LastMessageIndex int `json:"lastMessageIndex,omitempty"`
 	SectionID      string `json:"sectionId,omitempty"`
 }
 
@@ -63,6 +65,8 @@ type Request struct {
 	ConversationID string
 	// SectionID 是上一次生成返回的 section（继续对话时带回，服务端靠它定位上下文）。
 	SectionID string
+	// LastMessageIndex 是上次对话最后一条消息的序号，继续对话时带上。
+	LastMessageIndex int
 	// ContextMode 控制复用对话时是否用提示词隔开上下文：none / always / auto。
 	ContextMode string
 	// Timeout 覆盖默认超时。

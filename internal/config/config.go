@@ -38,6 +38,8 @@ type Account struct {
 	// 换了账号自然是另一个对话，所以按账号存。
 	ChatID      string `json:"chatId,omitempty"`
 	ChatSection string `json:"chatSection,omitempty"`
+	// ChatIndex 是对话里最后一条消息的序号，继续对话时带回（网页版也这么做）。
+	ChatIndex int `json:"chatIndex,omitempty"`
 }
 
 // Display 返回展示用名字：优先昵称，其次内部标识。
@@ -354,7 +356,7 @@ func (s *Store) UpdateProfile(name, nickname, avatar string) error {
 }
 
 // SetChat 记住这个账号当前使用的对话，下次生图继续往里发。
-func (s *Store) SetChat(name, conversationID, sectionID string) error {
+func (s *Store) SetChat(name, conversationID, sectionID string, lastMessageIndex int) error {
 	if strings.TrimSpace(conversationID) == "" {
 		return nil
 	}
@@ -363,6 +365,7 @@ func (s *Store) SetChat(name, conversationID, sectionID string) error {
 			if c.Accounts[i].Name == name {
 				c.Accounts[i].ChatID = conversationID
 				c.Accounts[i].ChatSection = sectionID
+				c.Accounts[i].ChatIndex = lastMessageIndex
 				return
 			}
 		}
@@ -376,6 +379,7 @@ func (s *Store) ClearChat(name string) error {
 			if c.Accounts[i].Name == name {
 				c.Accounts[i].ChatID = ""
 				c.Accounts[i].ChatSection = ""
+				c.Accounts[i].ChatIndex = 0
 				return
 			}
 		}

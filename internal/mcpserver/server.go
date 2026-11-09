@@ -322,7 +322,7 @@ func (s *Service) GenerateWithChat(ctx context.Context, acc config.Account, clie
 			return
 		}
 		if strings.TrimSpace(res.ConversationID) != "" {
-			_ = s.store.SetChat(acc.Name, res.ConversationID, res.SectionID)
+			_ = s.store.SetChat(acc.Name, res.ConversationID, res.SectionID, res.LastMessageIndex)
 			return
 		}
 		// 走旧通道兜底时服务端不返回对话 id，这次其实已经另起了一个对话；
@@ -343,6 +343,7 @@ func (s *Service) GenerateWithChat(ctx context.Context, acc config.Account, clie
 	if strings.TrimSpace(acc.ChatID) != "" {
 		req.ConversationID = acc.ChatID
 		req.SectionID = acc.ChatSection
+		req.LastMessageIndex = acc.ChatIndex
 		res, err := client.Generate(ctx, req)
 		if err == nil {
 			save(res)
@@ -353,7 +354,7 @@ func (s *Service) GenerateWithChat(ctx context.Context, acc config.Account, clie
 		}
 		s.logf("在已有对话 %s 里生成失败（%v），改用新对话重试", acc.ChatID, err)
 		_ = s.store.ClearChat(acc.Name)
-		req.ConversationID, req.SectionID = "", ""
+		req.ConversationID, req.SectionID, req.LastMessageIndex = "", "", 0
 	}
 
 	res, err := client.Generate(ctx, req)
