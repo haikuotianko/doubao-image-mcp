@@ -1,43 +1,43 @@
 {
-  "tag": "v1.3.0",
-  "name": "v1.3.0 复用对话与上下文隔离",
-  "published": "2026-11-09T07:05:23Z",
-  "url": "https://github.com/haikuotianko/doubao-image-mcp/releases/tag/v1.3.0",
+  "tag": "v1.4.0",
+  "name": "v1.4.0 风控滑块验证",
+  "published": "2026-11-09T09:33:43Z",
+  "url": "https://github.com/haikuotianko/doubao-image-mcp/releases/tag/v1.4.0",
   "assets": [
     {
-      "name": "doubao-image-mcp-v1.3.0-linux-arm64-cli.zip",
-      "size": 3567414,
-      "url": "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.3.0/doubao-image-mcp-v1.3.0-linux-arm64-cli.zip"
+      "name": "doubao-image-mcp-v1.4.0-linux-arm64-cli.zip",
+      "size": 3570706,
+      "url": "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.4.0/doubao-image-mcp-v1.4.0-linux-arm64-cli.zip"
     },
     {
-      "name": "doubao-image-mcp-v1.3.0-linux-x64-cli.zip",
-      "size": 3966328,
-      "url": "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.3.0/doubao-image-mcp-v1.3.0-linux-x64-cli.zip"
+      "name": "doubao-image-mcp-v1.4.0-linux-x64-cli.zip",
+      "size": 3970042,
+      "url": "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.4.0/doubao-image-mcp-v1.4.0-linux-x64-cli.zip"
     },
     {
-      "name": "doubao-image-mcp-v1.3.0-macos-arm64-cli.zip",
-      "size": 3700654,
-      "url": "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.3.0/doubao-image-mcp-v1.3.0-macos-arm64-cli.zip"
+      "name": "doubao-image-mcp-v1.4.0-macos-arm64-cli.zip",
+      "size": 3703411,
+      "url": "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.4.0/doubao-image-mcp-v1.4.0-macos-arm64-cli.zip"
     },
     {
-      "name": "doubao-image-mcp-v1.3.0-macos-x64-cli.zip",
-      "size": 4029930,
-      "url": "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.3.0/doubao-image-mcp-v1.3.0-macos-x64-cli.zip"
+      "name": "doubao-image-mcp-v1.4.0-macos-x64-cli.zip",
+      "size": 4033133,
+      "url": "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.4.0/doubao-image-mcp-v1.4.0-macos-x64-cli.zip"
     },
     {
-      "name": "doubao-image-mcp-v1.3.0-windows-arm64.zip",
-      "size": 5339245,
-      "url": "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.3.0/doubao-image-mcp-v1.3.0-windows-arm64.zip"
+      "name": "doubao-image-mcp-v1.4.0-windows-arm64.zip",
+      "size": 5341751,
+      "url": "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.4.0/doubao-image-mcp-v1.4.0-windows-arm64.zip"
     },
     {
-      "name": "doubao-image-mcp-v1.3.0-windows-x64.zip",
-      "size": 5977668,
-      "url": "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.3.0/doubao-image-mcp-v1.3.0-windows-x64.zip"
+      "name": "doubao-image-mcp-v1.4.0-windows-x64.zip",
+      "size": 5984140,
+      "url": "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.4.0/doubao-image-mcp-v1.4.0-windows-x64.zip"
     },
     {
-      "name": "doubao-image-mcp-v1.3.0-windows-x86.zip",
-      "size": 5805818,
-      "url": "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.3.0/doubao-image-mcp-v1.3.0-windows-x86.zip"
+      "name": "doubao-image-mcp-v1.4.0-windows-x86.zip",
+      "size": 5811264,
+      "url": "https://github.com/haikuotianko/doubao-image-mcp/releases/download/v1.4.0/doubao-image-mcp-v1.4.0-windows-x86.zip"
     }
   ]
 }
