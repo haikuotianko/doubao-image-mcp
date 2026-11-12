@@ -1,0 +1,8 @@
+.git
+build
+docs/promo
+frontend/node_modules
+frontend/dist
+*.exe
+*.zip
+*.log
