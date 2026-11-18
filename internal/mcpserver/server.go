@@ -131,6 +131,18 @@ type LoginOutput struct {
 }
 
 // NewServer 组装一个带全部工具的 MCP server（每次会话一个实例，但状态都在 store 里）。
+// annotate 生成工具的行为提示（MCP 规范的四个 hint）。
+// 目录站点（M8ven 等）和严格的宿主会据此决定要不要弹确认；
+// 缺任意一个 hint 都可能在审核里被扣分。
+func annotate(readOnly, destructive, idempotent, openWorld bool) *mcp.ToolAnnotations {
+	return &mcp.ToolAnnotations{
+		ReadOnlyHint:    readOnly,
+		DestructiveHint: &destructive,
+		IdempotentHint:  idempotent,
+		OpenWorldHint:   &openWorld,
+	}
+}
+
 func (s *Service) NewServer() *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "doubao-image-mcp",
@@ -142,21 +154,25 @@ func (s *Service) NewServer() *mcp.Server {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "doubao_login",
 		Description: "弹出扫码登录窗口，让用户用豆包 App 扫码。没有账号、登录态失效、或 doubao_image 报「未登录」时调用它。",
+		Annotations: annotate(false, false, false, true),
 	}, s.handleLogin)
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "doubao_verify",
 		Description: "打开豆包窗口让你手动完成人机验证（滑块）。生图被风控（710022004 / 710022002）时调用它，拖完滑块再重试 doubao_image。",
+		Annotations: annotate(false, false, false, true),
 	}, s.handleVerify)
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "doubao_image",
 		Description: "用豆包网页版生成图片（文生图；给了 ref_images 就是图生图）。返回本地路径与图片链接。没登录时先调 doubao_login。",
+		Annotations: annotate(false, false, false, true),
 	}, s.handleImage)
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "doubao_models",
 		Description: "列出豆包可用的生图模型、风格 option_key 与常用比例。",
+		Annotations: annotate(true, false, true, false),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in struct{}) (*mcp.CallToolResult, ModelsOutput, error) {
 		cfg := s.store.Get()
 		return nil, ModelsOutput{
@@ -170,11 +186,13 @@ func (s *Service) NewServer() *mcp.Server {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "doubao_ping",
 		Description: "检查当前账号登录态是否有效（顺带判断是否被 IP 风控）。",
+		Annotations: annotate(true, false, true, true),
 	}, s.handlePing)
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "doubao_accounts",
 		Description: "查看/切换/移除已登录的豆包账号。",
+		Annotations: annotate(false, true, false, false),
 	}, s.handleAccounts)
 
 	return server

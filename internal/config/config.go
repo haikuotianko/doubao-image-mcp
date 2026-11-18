@@ -137,8 +137,11 @@ type Store struct {
 }
 
 // Load 读取配置；文件不存在时用默认配置并落盘一次，方便用户直接编辑。
-func Load() (*Store, error) {
-	s := &Store{cfg: Default(), path: Path()}
+func Load() (*Store, error) { return LoadAt(Dir()) }
+
+// LoadAt 从指定目录读取（或初始化）配置，便于测试和自定义部署位置。
+func LoadAt(dir string) (*Store, error) {
+	s := &Store{cfg: Default(), path: filepath.Join(dir, "config.json")}
 	data, err := os.ReadFile(s.path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
