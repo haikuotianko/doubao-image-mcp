@@ -28,3 +28,4 @@ desktop.ini
 
 # Wails 用来判断 npm 依赖是否已安装的指纹文件：提交上去会让别人 clone 后跳过 npm install
 frontend/package.json.md5
+build/promo/
