@@ -1,6 +1,7 @@
 # 豆包生图 MCP（doubao-image-mcp）
 
 [![Listed on mcpservers.org](https://mcpservers.org/badge.svg)](https://mcpservers.org/servers/haikuotianko/doubao-image-mcp)
+[![M8ven Score](https://m8ven.ai/badge/mcp/haikuotianko-doubao-image-mcp-11h6av?v=b4a30cd4dc2dfb0f45f295f8933443ef)](https://m8ven.ai/mcp/haikuotianko-doubao-image-mcp-11h6av?s=readme)
 
 **官网 / 下载页：<https://haikuotianko.github.io/doubao-image-mcp/>**
 
