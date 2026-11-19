@@ -117,6 +117,8 @@ type Status struct {
 	AutoStartHTTP bool           `json:"autoStartHttp"`
 	ReuseChat     bool           `json:"reuseChat"`
 	ContextMode   string         `json:"contextMode"`
+	HTTPToken     string         `json:"httpToken"`
+	HTTPRateLimit int            `json:"httpRateLimit"`
 	ConfigPath    string         `json:"configPath"`
 	ExePath       string         `json:"exePath"`
 	AppVersion    string         `json:"appVersion"`
@@ -142,6 +144,8 @@ func (a *App) Status() Status {
 		FitRatio:      cfg.FitRatio,
 		AutoStartHTTP: cfg.AutoStartHTTP,
 		ReuseChat:     cfg.ReuseChat(),
+		HTTPToken:     cfg.HTTPToken,
+		HTTPRateLimit: cfg.HTTPRateLimit,
 		ContextMode:   cfg.ContextMode,
 		ConfigPath:    config.Path(),
 		ExePath:       exePath(),
@@ -232,6 +236,10 @@ type Settings struct {
 	AutoStartHTTP bool   `json:"autoStartHttp"`
 	ReuseChat     bool   `json:"reuseChat"`
 	ContextMode   string `json:"contextMode"`
+	// HTTPToken 留空表示 HTTP 模式不鉴权。
+	HTTPToken string `json:"httpToken"`
+	// HTTPRateLimit 是每分钟请求上限，0 表示不限制。
+	HTTPRateLimit int `json:"httpRateLimit"`
 }
 
 // SaveSettings 落盘配置。
@@ -248,6 +256,11 @@ func (a *App) SaveSettings(s Settings) error {
 			cfg.HTTPAddr = strings.TrimSpace(s.HTTPAddr)
 		}
 		cfg.AutoStartHTTP = s.AutoStartHTTP
+		cfg.HTTPToken = strings.TrimSpace(s.HTTPToken)
+		if s.HTTPRateLimit < 0 {
+			s.HTTPRateLimit = 0
+		}
+		cfg.HTTPRateLimit = s.HTTPRateLimit
 		cfg.NoReuseChat = !s.ReuseChat
 		if strings.TrimSpace(s.ContextMode) != "" {
 			cfg.ContextMode = doubao.NormalizeContextMode(s.ContextMode)

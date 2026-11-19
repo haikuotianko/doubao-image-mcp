@@ -83,3 +83,26 @@ func TestReorderIgnoresUnknown(t *testing.T) {
 		t.Fatalf("已知账号应排在前，实际 %v", got)
 	}
 }
+
+// HTTP 令牌与限流必须能落盘并读回（JSON tag 写错会静默丢失）。
+func TestHTTPGuardConfigRoundTrip(t *testing.T) {
+	s := newTestStore(t)
+	if err := s.Update(func(c *Config) {
+		c.HTTPToken = "tok-123"
+		c.HTTPRateLimit = 42
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	reloaded, err := LoadAt(filepath.Dir(s.path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := reloaded.Get()
+	if cfg.HTTPToken != "tok-123" {
+		t.Errorf("HTTPToken 读回为 %q", cfg.HTTPToken)
+	}
+	if cfg.HTTPRateLimit != 42 {
+		t.Errorf("HTTPRateLimit 读回为 %d", cfg.HTTPRateLimit)
+	}
+}

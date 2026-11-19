@@ -107,6 +107,12 @@ document.querySelector('#app').innerHTML = `
           <input type="checkbox" id="autoStartHttp" style="width:auto;margin-right:6px" />
           GUI 启动时自动开启 MCP HTTP 服务
         </label>
+        <label>HTTP 访问令牌</label>
+        <input type="text" id="httpToken" placeholder="留空 = 不鉴权（仅本机访问时够用）" />
+        <span class="hint" style="margin:0">配置后，客户端调用 HTTP 模式需带 Authorization: Bearer &lt;令牌&gt;</span>
+        <label>每分钟请求上限</label>
+        <input type="number" id="httpRateLimit" min="0" step="1" placeholder="0 = 不限制" />
+        <span class="hint" style="margin:0">超过上限返回 429。生图本身已有排队，这里防的是客户端异常刷请求</span>
       </div>
       <div class="row" style="margin-top:12px">
         <button class="primary" id="btnSave">保存设置</button>
@@ -322,6 +328,8 @@ function renderStatus(status) {
   el('httpAddr').value = status.httpAddr || '';
   el('fitRatio').checked = !!status.fitRatio;
   el('autoStartHttp').checked = !!status.autoStartHttp;
+  el('httpToken').value = status.httpToken || '';
+  el('httpRateLimit').value = status.httpRateLimit || 0;
   el('reuseChat').checked = !!status.reuseChat;
   el('contextMode').value = status.contextMode || 'auto';
 
@@ -636,6 +644,8 @@ el('btnSave').onclick = async () => {
     contextMode: el('contextMode').value,
     httpAddr: el('httpAddr').value,
     autoStartHttp: el('autoStartHttp').checked,
+    httpToken: el('httpToken').value,
+    httpRateLimit: parseInt(el('httpRateLimit').value || '0', 10) || 0,
   };
   await run(() => SaveSettings(payload), '设置已保存');
   refresh();

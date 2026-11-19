@@ -269,6 +269,22 @@ mac/Linux 上的 GUI 里，「扫码登录」按钮会换成**手动导入 sessi
 
 在客户端里问一句「用 doubao_ping 看看豆包登录态」，返回 `账号 xxx 登录态正常` 就通了。返回「还没有登录任何豆包账号」说明账号不在配置里，回 GUI 扫码即可。
 
+### HTTP 模式的鉴权与限流（可选）
+
+HTTP 模式默认只监听 `127.0.0.1`，**默认不鉴权**。如果你的机器是多用户共用、或者想把端口开放给局域网，请在 GUI 设置的「HTTP 访问令牌」里填一个令牌：
+
+```bash
+# 配置后，客户端请求必须带令牌
+curl -H "Authorization: Bearer <你的令牌>" http://127.0.0.1:8770/mcp
+```
+
+同时在「每分钟请求上限」里可以设一个数值（0 = 不限制）。超过上限会返回 `429 Too Many Requests` 和 `Retry-After: 60`。
+
+两者都**默认关闭**，不配置时行为与之前完全一致。
+
+> 注意：这和生图的排队机制是两件事。
+> **排队**是保护豆包账号（每个账号同时只跑 1 个任务，多了排队）；**限流**是保护服务本身不被客户端异常刷爆。
+
 ## 工具参考
 
 ### `doubao_image` —— 生成图片
@@ -453,6 +469,8 @@ mac/Linux 上的 GUI 里，「扫码登录」按钮会换成**手动导入 sessi
 | 运行日志 | `%APPDATA%\doubao-image-mcp\app.log`（超过 2MB 滚成 `app.log.1`） |
 | stdio 日志 | `%APPDATA%\doubao-image-mcp\mcp.log` |
 | 默认输出 | `%USERPROFILE%\Pictures\doubao-image-mcp` |
+
+数据如何被使用、会联网访问哪些地址，见 [PRIVACY.md](PRIVACY.md)。一句话：**不收集任何数据**，全部在本地。
 
 ## 排障
 

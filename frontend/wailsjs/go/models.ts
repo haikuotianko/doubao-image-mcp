@@ -95,6 +95,8 @@ export namespace main {
 	    autoStartHttp: boolean;
 	    reuseChat: boolean;
 	    contextMode: string;
+	    httpToken: string;
+	    httpRateLimit: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -111,6 +113,8 @@ export namespace main {
 	        this.autoStartHttp = source["autoStartHttp"];
 	        this.reuseChat = source["reuseChat"];
 	        this.contextMode = source["contextMode"];
+	        this.httpToken = source["httpToken"];
+	        this.httpRateLimit = source["httpRateLimit"];
 	    }
 	}
 	export class Status {
@@ -127,6 +131,8 @@ export namespace main {
 	    autoStartHttp: boolean;
 	    reuseChat: boolean;
 	    contextMode: string;
+	    httpToken: string;
+	    httpRateLimit: number;
 	    configPath: string;
 	    exePath: string;
 	    appVersion: string;
@@ -156,6 +162,8 @@ export namespace main {
 	        this.autoStartHttp = source["autoStartHttp"];
 	        this.reuseChat = source["reuseChat"];
 	        this.contextMode = source["contextMode"];
+	        this.httpToken = source["httpToken"];
+	        this.httpRateLimit = source["httpRateLimit"];
 	        this.configPath = source["configPath"];
 	        this.exePath = source["exePath"];
 	        this.appVersion = source["appVersion"];

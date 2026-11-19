@@ -3,6 +3,7 @@ package mcpserver
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -31,6 +32,34 @@ type Service struct {
 
 	mu      sync.Mutex
 	running bool
+
+	limiter rateLimiter
+}
+
+// rateLimiter 是固定窗口的每分钟限流器：实现简单、行为可解释。
+// perMin <= 0 表示不限制。
+type rateLimiter struct {
+	mu     sync.Mutex
+	window int64
+	count  int
+}
+
+func (r *rateLimiter) allow(now time.Time, perMin int) bool {
+	if perMin <= 0 {
+		return true
+	}
+	w := now.Unix() / 60
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if w != r.window {
+		r.window = w
+		r.count = 0
+	}
+	if r.count >= perMin {
+		return false
+	}
+	r.count++
+	return true
 }
 
 // New 创建服务。
@@ -588,6 +617,33 @@ func (s *Service) ServeStdio(ctx context.Context) error {
 	return s.NewServer().Run(ctx, &mcp.StdioTransport{})
 }
 
+// guardHTTP 负责可选的令牌鉴权与每分钟限流，两者都由用户在设置里开启。
+func (s *Service) guardHTTP(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cfg := s.store.Get()
+
+		if tok := strings.TrimSpace(cfg.HTTPToken); tok != "" {
+			got := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+			if got == "" {
+				got = r.URL.Query().Get("token")
+			}
+			if subtle.ConstantTimeCompare([]byte(got), []byte(tok)) != 1 {
+				w.Header().Set("WWW-Authenticate", `Bearer realm="doubao-image-mcp"`)
+				http.Error(w, "unauthorized: 已配置 HTTP 令牌，请带上 Authorization: Bearer <令牌>", http.StatusUnauthorized)
+				return
+			}
+		}
+
+		if !s.limiter.allow(time.Now(), cfg.HTTPRateLimit) {
+			w.Header().Set("Retry-After", "60")
+			http.Error(w, "too many requests: 超过每分钟请求上限（设置里可调整）", http.StatusTooManyRequests)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 // HTTPHandler 返回 streamable HTTP handler（每个请求一个 server 实例）。
 func (s *Service) HTTPHandler() http.Handler {
 	return mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
@@ -598,8 +654,9 @@ func (s *Service) HTTPHandler() http.Handler {
 // StartHTTP 在 addr 上启动 streamable HTTP 服务，返回可用于关闭的 server。
 func (s *Service) StartHTTP(addr string) (*http.Server, error) {
 	mux := http.NewServeMux()
-	mux.Handle("/mcp", s.HTTPHandler())
-	mux.Handle("/mcp/", s.HTTPHandler())
+	guard := s.guardHTTP(s.HTTPHandler())
+	mux.Handle("/mcp", guard)
+	mux.Handle("/mcp/", guard)
 	httpServer := &http.Server{Addr: addr, Handler: mux}
 
 	s.mu.Lock()

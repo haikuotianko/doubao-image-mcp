@@ -84,7 +84,13 @@ type Config struct {
 	DefaultStyle  string `json:"defaultStyle"`
 	HTTPAddr      string `json:"httpAddr"`
 	AutoStartHTTP bool   `json:"autoStartHttp"`
-	Debug         bool   `json:"debug"`
+
+	// HTTPToken 非空时，HTTP 模式要求请求带 Authorization: Bearer <token>。
+	// 留空表示不鉴权（默认只监听 127.0.0.1）。
+	HTTPToken string `json:"httpToken,omitempty"`
+	// HTTPRateLimit 是 HTTP 模式每分钟允许的 MCP 请求数；0 表示不限制。
+	HTTPRateLimit int  `json:"httpRateLimit,omitempty"`
+	Debug         bool `json:"debug"`
 
 	// NoReuseChat 为 true 时每次生图都新建对话。
 	// 默认是「复用同一个对话」，用反向字段才能让老配置（没有该字段）也默认开启。
